@@ -335,7 +335,56 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     </div>
     <div id="relatorio-content"><div class="empty-state">Selecione um aluno acima.</div></div>
   </div>
-</div>
+
+  <!-- CONFIG GITHUB -->
+  <div id="section-config" class="section">
+    <div style="max-width:580px">
+      <div class="add-form">
+        <h3>🔐 Configurar repositório</h3>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.7">Os dados (agenda, alunos, registros) são salvos no arquivo <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">data.json</code> do repositório. Cada edição faz um commit automático.</p>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group"><label>Usuário GitHub</label><input type="text" id="gh-user" placeholder="Ex: williamsilva" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Nome do repositório</label><input type="text" id="gh-repo" placeholder="Ex: controle-horas" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Branch</label><input type="text" id="gh-branch" placeholder="main" value="main"></div>
+          <div class="form-group"><label>Caminho do arquivo</label><input type="text" id="gh-path" placeholder="data.json" value="data.json"></div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Personal Access Token</label>
+            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password" spellcheck="false">
+            <span class="hint-text" style="margin-top:3px">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → <b>Contents: Read &amp; write</b></span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="ghSaveConfig()">💾 Salvar configuração</button>
+          <button class="btn-secondary" onclick="ghTestAndLoad()">🔌 Testar conexão</button>
+          <span id="gh-test-result" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <div class="add-form" style="margin-top:.75rem">
+        <h3>📡 Sincronização</h3>
+        <div id="gh-status-detail" class="hint-text" style="margin-bottom:1rem">Configure acima para ativar.</div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="ghPush('manual')">⬆ Enviar dados agora</button>
+          <button class="btn-secondary" onclick="ghPull()">⬇ Carregar do GitHub</button>
+          <button class="btn-secondary" onclick="ghClearConfig()" style="color:var(--red-text);border-color:var(--red-bg)">Desconectar</button>
+        </div>
+      </div>
+
+      <div class="add-form" style="margin-top:.75rem">
+        <h3>📋 Passo a passo</h3>
+        <ol style="font-size:12px;color:var(--text2);line-height:2.1;padding-left:1.2rem">
+          <li>Suba o <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">index.html</code> na raiz do repositório</li>
+          <li>Ative GitHub Pages: Settings → Pages → Source: Branch main</li>
+          <li>Gere um token: Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → Contents: Read &amp; write</li>
+          <li>Preencha os campos acima e clique em <b>Salvar configuração</b></li>
+          <li>Clique em <b>Testar conexão</b> — se aparecer ✅ está tudo certo</li>
+          <li>A partir daí cada alteração salva automaticamente no GitHub 🎉</li>
+        </ol>
+      </div>
+    </div>
+  </div><!-- /#section-config -->
+
+</div><!-- /.main -->
 
 <!-- MODAL EVENTO AGENDA -->
 <div class="modal-overlay" id="modal-ev" onclick="if(event.target===this)closeModal('modal-ev')">
@@ -408,57 +457,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
       <button class="btn-primary" onclick="saveEditRegistro()">Salvar</button>
     </div>
   </div>
-  <!-- CONFIG GITHUB -->
-  <div id="section-config" class="section">
-    <div class="section-header"><h2>Sincronização com GitHub</h2></div>
-    <div style="max-width:580px">
-      <div class="add-form">
-        <h3>🔐 Configurar repositório</h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.7">Os dados (agenda, alunos, registros) são salvos no arquivo <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">data.json</code> do seu repositório. Cada edição faz um commit automático.</p>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-group"><label>Usuário GitHub</label><input type="text" id="gh-user" placeholder="Ex: williamsilva" autocomplete="off" spellcheck="false"></div>
-          <div class="form-group"><label>Nome do repositório</label><input type="text" id="gh-repo" placeholder="Ex: controle-horas" autocomplete="off" spellcheck="false"></div>
-          <div class="form-group"><label>Branch</label><input type="text" id="gh-branch" placeholder="main" value="main"></div>
-          <div class="form-group"><label>Caminho do arquivo</label><input type="text" id="gh-path" placeholder="data.json" value="data.json"></div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Personal Access Token (Fine-grained ou Classic)</label>
-            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password" spellcheck="false">
-            <span class="hint-text" style="margin-top:3px">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → <b>Contents: Read &amp; write</b></span>
-          </div>
-        </div>
-        <div class="btn-row">
-          <button class="btn-primary" onclick="ghSaveConfig()">💾 Salvar configuração</button>
-          <button class="btn-secondary" onclick="ghTestAndLoad()">🔌 Testar conexão</button>
-          <span id="gh-test-result" style="font-size:12px"></span>
-        </div>
-      </div>
-
-      <div class="add-form" style="margin-top:.75rem">
-        <h3>📡 Sincronização</h3>
-        <div id="gh-status-detail" class="hint-text" style="margin-bottom:1rem">Configure acima para ativar.</div>
-        <div class="btn-row">
-          <button class="btn-primary" onclick="ghPush('manual')">⬆ Enviar dados agora</button>
-          <button class="btn-secondary" onclick="ghPull()">⬇ Carregar do GitHub</button>
-          <button class="btn-secondary" onclick="ghClearConfig()" style="color:var(--red-text);border-color:var(--red-bg)">Desconectar</button>
-        </div>
-      </div>
-
-      <div class="add-form" style="margin-top:.75rem">
-        <h3>📋 Passo a passo</h3>
-        <ol style="font-size:12px;color:var(--text2);line-height:2.1;padding-left:1.2rem">
-          <li>Crie um repositório no GitHub (ex: <b>controle-horas</b>)</li>
-          <li>Suba o <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">index.html</code> na raiz do repositório</li>
-          <li>Ative GitHub Pages: Settings → Pages → Source: Deploy from branch → main</li>
-          <li>Gere um token: Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repositório → Contents: Read &amp; write → Generate</li>
-          <li>Preencha os campos acima e clique em <b>Salvar configuração</b></li>
-          <li>Clique em <b>Testar conexão</b> — se aparecer ✅ está tudo certo</li>
-          <li>A partir daí cada alteração salva automaticamente no GitHub 🎉</li>
-        </ol>
-      </div>
-    </div>
-  </div>
-
-</div><!-- /.main -->
+</div><!-- modal-reg -->
 
 <script>
 /* ── CONSTANTS ── */
