@@ -336,50 +336,27 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     <div id="relatorio-content"><div class="empty-state">Selecione um aluno acima.</div></div>
   </div>
 
-  <!-- CONFIG GITHUB -->
+  <!-- CONFIG / STATUS FIREBASE -->
   <div id="section-config" class="section">
     <div style="max-width:580px">
       <div class="add-form">
-        <h3>🔐 Configurar repositório</h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.7">Os dados (agenda, alunos, registros) são salvos no arquivo <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">data.json</code> do repositório. Cada edição faz um commit automático.</p>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-group"><label>Usuário GitHub</label><input type="text" id="gh-user" placeholder="Ex: williamsilva" autocomplete="off" spellcheck="false"></div>
-          <div class="form-group"><label>Nome do repositório</label><input type="text" id="gh-repo" placeholder="Ex: controle-horas" autocomplete="off" spellcheck="false"></div>
-          <div class="form-group"><label>Branch</label><input type="text" id="gh-branch" placeholder="main" value="main"></div>
-          <div class="form-group"><label>Caminho do arquivo</label><input type="text" id="gh-path" placeholder="data.json" value="data.json"></div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Personal Access Token</label>
-            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password" spellcheck="false">
-            <span class="hint-text" style="margin-top:3px">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → <b>Contents: Read &amp; write</b></span>
-          </div>
-        </div>
+        <h3>🔥 Firebase Firestore — Status</h3>
+        <div id="gh-status-detail" class="hint-text" style="margin-bottom:1rem;font-size:13px">Conectando...</div>
         <div class="btn-row">
-          <button class="btn-primary" onclick="ghSaveConfig()">💾 Salvar configuração</button>
-          <button class="btn-secondary" onclick="ghTestAndLoad()">🔌 Testar conexão</button>
-          <span id="gh-test-result" style="font-size:12px"></span>
+          <button class="btn-primary" onclick="fbPush('manual')">⬆ Forçar envio agora</button>
+          <button class="btn-secondary" onclick="fbListen()">🔄 Reconectar listener</button>
         </div>
       </div>
 
       <div class="add-form" style="margin-top:.75rem">
-        <h3>📡 Sincronização</h3>
-        <div id="gh-status-detail" class="hint-text" style="margin-bottom:1rem">Configure acima para ativar.</div>
-        <div class="btn-row">
-          <button class="btn-primary" onclick="ghPush('manual')">⬆ Enviar dados agora</button>
-          <button class="btn-secondary" onclick="ghPull()">⬇ Carregar do GitHub</button>
-          <button class="btn-secondary" onclick="ghClearConfig()" style="color:var(--red-text);border-color:var(--red-bg)">Desconectar</button>
-        </div>
-      </div>
-
-      <div class="add-form" style="margin-top:.75rem">
-        <h3>📋 Passo a passo</h3>
-        <ol style="font-size:12px;color:var(--text2);line-height:2.1;padding-left:1.2rem">
-          <li>Suba o <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">index.html</code> na raiz do repositório</li>
-          <li>Ative GitHub Pages: Settings → Pages → Source: Branch main</li>
-          <li>Gere um token: Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → Contents: Read &amp; write</li>
-          <li>Preencha os campos acima e clique em <b>Salvar configuração</b></li>
-          <li>Clique em <b>Testar conexão</b> — se aparecer ✅ está tudo certo</li>
-          <li>A partir daí cada alteração salva automaticamente no GitHub 🎉</li>
-        </ol>
+        <h3>ℹ️ Como funciona</h3>
+        <ul style="font-size:12px;color:var(--text2);line-height:2.1;padding-left:1.2rem;list-style:disc">
+          <li>Os dados ficam salvos no <b>Firebase Firestore</b> em tempo real</li>
+          <li>Qualquer pessoa que abrir o link vê as alterações <b>instantaneamente</b></li>
+          <li>O indicador <b>● Ao vivo</b> no topo confirma que a conexão está ativa</li>
+          <li>Se ficar offline, as alterações são salvas localmente e sincronizadas quando a conexão voltar</li>
+          <li>Projeto Firebase: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">agenda-engnhariawill</code></li>
+        </ul>
       </div>
     </div>
   </div><!-- /#section-config -->
@@ -471,155 +448,127 @@ const slotToY=s=>(s-TIMES_START)*SLOT_PX;
 
 /* ── STORAGE ── */
 const SK_EV='ctrl2_ev',SK_R='ctrl2_reg',SK_A='ctrl2_alunos',SK_C='ctrl2_cfg',SK_WK='ctrl2_week';
-const SK_GH='ctrl2_gh'; // github config storage key
 const loadJ=(k,d)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):d}catch(e){return d}};
-const saveJ=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}; ghAutoSync();};
+// saveJ defined after Firebase section above
 
-/* ── GITHUB SYNC ── */
-let ghCfg=loadJ(SK_GH,null);
-let ghSyncTimer=null;
-let ghFileSha=null; // current SHA of data.json on GitHub
+/* ── FIREBASE CONFIG ── */
+const FB_CONFIG={
+  apiKey:"AIzaSyBSHSDCW3URM_CfkbJc4C-OX_H3MJjtd58",
+  authDomain:"agenda-engnhariawill.firebaseapp.com",
+  projectId:"agenda-engnhariawill",
+  storageBucket:"agenda-engnhariawill.firebasestorage.app",
+  messagingSenderId:"766225328741",
+  appId:"1:766225328741:web:b0b2746d185190de7b348c"
+};
 
-function ghGetCfg(){return loadJ(SK_GH,null)}
+/* ── FIREBASE REALTIME SYNC ── */
+let fbDb=null, fbUnsubscribes=[], fbReady=false, fbPushTimer=null;
 
-function ghSaveConfig(){
-  const user=document.getElementById('gh-user').value.trim();
-  const repo=document.getElementById('gh-repo').value.trim();
-  const token=document.getElementById('gh-token').value.trim();
-  const branch=document.getElementById('gh-branch').value.trim()||'main';
-  const path=document.getElementById('gh-path').value.trim()||'data.json';
-  if(!user||!repo||!token){alert('Preencha usuário, repositório e token.');return}
-  ghCfg={user,repo,token,branch,path};
-  localStorage.setItem(SK_GH,JSON.stringify(ghCfg));
-  ghUpdateStatusUI('Configuração salva. Testando conexão...');
-  ghTestAndLoad();
+function fbInit(){
+  // load Firebase SDK dynamically
+  const s1=document.createElement('script');
+  s1.src='https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js';
+  s1.onload=()=>{
+    const s2=document.createElement('script');
+    s2.src='https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js';
+    s2.onload=fbStart;
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
 }
 
-function ghClearConfig(){
-  if(!confirm('Desconectar do GitHub? Os dados locais são mantidos.'))return;
-  localStorage.removeItem(SK_GH);
-  ghCfg=null;ghFileSha=null;
-  ghUpdateStatusUI(null);
-  ghFillForm();
-}
-
-function ghFillForm(){
-  if(!ghCfg)return;
-  document.getElementById('gh-user').value=ghCfg.user||'';
-  document.getElementById('gh-repo').value=ghCfg.repo||'';
-  document.getElementById('gh-branch').value=ghCfg.branch||'main';
-  document.getElementById('gh-path').value=ghCfg.path||'data.json';
-  // don't prefill token for security
-}
-
-function ghApiUrl(){
-  const c=ghCfg;if(!c)return null;
-  return `https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}?ref=${c.branch}`;
-}
-
-async function ghFetch(method,body=null){
-  const c=ghCfg;if(!c)return null;
-  const url=`https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}`;
-  const opts={method,headers:{'Authorization':`Bearer ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}};
-  if(body)opts.body=JSON.stringify(body);
-  const res=await fetch(url,opts);
-  if(!res.ok){const t=await res.text();throw new Error(`GitHub API ${res.status}: ${t}`)}
-  return res.json();
-}
-
-async function ghTestAndLoad(){
-  const el=document.getElementById('gh-test-result');
-  el.textContent='⏳ Testando...';el.style.color='var(--text3)';
-  setSyncStatus('syncing','Conectando...');
+function fbStart(){
   try{
-    const data=await ghFetchFile();
-    if(data){
-      el.textContent='✅ Conectado! Dados carregados do GitHub.';el.style.color='var(--green-text)';
-      ghUpdateStatusUI('Conectado e sincronizado.');
-    }else{
-      el.textContent='✅ Conectado! Repositório acessível (arquivo data.json ainda não existe — será criado no primeiro save).';el.style.color='var(--green-text)';
-      ghUpdateStatusUI('Conectado. Aguardando primeiro save.');
-    }
-    setSyncStatus('ok','Sincronizado');
+    if(!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    fbDb=firebase.firestore();
+    fbReady=true;
+    setSyncStatus('syncing','Conectando ao Firebase...');
+    fbListen();
+    fbUpdateStatusUI('Conectado ao Firebase Firestore ✅');
   }catch(e){
-    el.textContent='❌ Erro: '+e.message;el.style.color='var(--red-text)';
-    setSyncStatus('err','Erro de conexão');
-    ghUpdateStatusUI('Erro: '+e.message);
+    setSyncStatus('err','Erro Firebase');
+    console.error('Firebase init error',e);
   }
 }
 
-async function ghFetchFile(){
-  const c=ghCfg;if(!c)return null;
-  try{
-    const url=`https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}?ref=${c.branch}&t=${Date.now()}`;
-    const res=await fetch(url,{headers:{'Authorization':`Bearer ${c.token}`,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
-    if(res.status===404)return null;
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
-    const json=await res.json();
-    ghFileSha=json.sha;
-    const decoded=JSON.parse(atob(json.content.replace(/\n/g,'')));
-    // load into app state
-    if(decoded.events!==undefined){events=decoded.events;saveJ(SK_EV,events)}
-    if(decoded.alunos!==undefined){alunos=decoded.alunos;saveJ(SK_A,alunos)}
-    if(decoded.registros!==undefined){registros=decoded.registros;saveJ(SK_R,registros)}
-    if(decoded.config!==undefined){config=decoded.config;saveJ(SK_C,config)}
-    nextEvId=events.length?Math.max(...events.map(e=>e.id))+1:100;
-    nextAid=alunos.length?Math.max(...alunos.map(a=>a.id))+1:20;
-    nextRid=registros.length?Math.max(...registros.map(r=>r.id))+1:20;
-    populateSelects();renderCalendar();renderAll();
-    return decoded;
-  }catch(e){if(e.message.includes('404'))return null;throw e}
+function fbListen(){
+  if(!fbDb) return;
+  // Unsubscribe previous listeners
+  fbUnsubscribes.forEach(u=>u());
+  fbUnsubscribes=[];
+
+  const docRef=fbDb.collection('agenda').doc('dados');
+
+  const unsub=docRef.onSnapshot(snap=>{
+    if(!snap.exists){
+      // First time — push default data
+      fbPush('init');
+      return;
+    }
+    const d=snap.data();
+    let changed=false;
+    if(d.events!==undefined){events=d.events; saveJ(SK_EV,events,true); changed=true;}
+    if(d.alunos!==undefined){alunos=d.alunos; saveJ(SK_A,alunos,true); changed=true;}
+    if(d.registros!==undefined){registros=d.registros; saveJ(SK_R,registros,true); changed=true;}
+    if(d.config!==undefined){config=d.config; saveJ(SK_C,config,true); changed=true;}
+    if(changed){
+      nextEvId=events.length?Math.max(...events.map(e=>e.id))+1:100;
+      nextAid=alunos.length?Math.max(...alunos.map(a=>a.id))+1:20;
+      nextRid=registros.length?Math.max(...registros.map(r=>r.id))+1:20;
+      populateSelects(); renderCalendar(); renderAll();
+      setSyncStatus('ok','● Ao vivo');
+      fbUpdateStatusUI(`Última atualização: ${new Date().toLocaleString('pt-BR')}`);
+    }
+  }, err=>{
+    setSyncStatus('err','Erro de conexão');
+    console.error('Firestore listener error',err);
+  });
+
+  fbUnsubscribes.push(unsub);
 }
 
-async function ghPush(source='auto'){
-  const c=ghCfg;if(!c)return;
+async function fbPush(source='auto'){
+  if(!fbDb){return;}
   setSyncStatus('syncing','Salvando...');
   try{
-    const payload={events,alunos,registros,config,savedAt:new Date().toISOString()};
-    const content=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
-    const body={message:`[controle-horas] update ${new Date().toLocaleString('pt-BR')}`,content,branch:c.branch};
-    if(ghFileSha)body.sha=ghFileSha;
-    const res=await ghFetch('PUT',body);
-    ghFileSha=res.content.sha;
-    setSyncStatus('ok','Salvo no GitHub ✓');
-    ghUpdateStatusUI(`Último sync: ${new Date().toLocaleString('pt-BR')}`);
+    await fbDb.collection('agenda').doc('dados').set({
+      events, alunos, registros, config,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setSyncStatus('ok','● Ao vivo');
+    fbUpdateStatusUI(`Salvo em: ${new Date().toLocaleString('pt-BR')}`);
   }catch(e){
     setSyncStatus('err','Erro ao salvar');
-    ghUpdateStatusUI('Erro ao salvar: '+e.message);
-    console.error('ghPush error',e);
+    console.error('fbPush error',e);
   }
 }
 
-async function ghPull(){
-  const c=ghCfg;if(!c){alert('Configure o GitHub primeiro.');return}
-  setSyncStatus('syncing','Carregando...');
-  try{
-    const data=await ghFetchFile();
-    if(data){setSyncStatus('ok','Dados carregados ✓');ghUpdateStatusUI(`Carregado em: ${new Date().toLocaleString('pt-BR')}`)}
-    else{setSyncStatus('ok','Arquivo não encontrado no repo ainda.');ghUpdateStatusUI('Arquivo ainda não existe no repositório.')}
-  }catch(e){setSyncStatus('err','Erro ao carregar');console.error(e)}
-}
-
-// debounced auto-push: waits 1.5s after last change
-function ghAutoSync(){
-  if(!ghCfg)return;
-  clearTimeout(ghSyncTimer);
-  ghSyncTimer=setTimeout(()=>ghPush('auto'),1500);
+function fbAutoSync(){
+  if(!fbDb) return;
+  clearTimeout(fbPushTimer);
+  fbPushTimer=setTimeout(()=>fbPush('auto'),800);
 }
 
 function setSyncStatus(state,msg){
   const el=document.getElementById('sync-status');
-  if(!ghCfg){el.style.display='none';return}
   el.style.display='inline-block';
-  if(state==='ok'){el.style.background='var(--green-bg)';el.style.color='var(--green-text)'}
-  else if(state==='syncing'){el.style.background='var(--amber-bg)';el.style.color='var(--amber-text)'}
-  else{el.style.background='var(--red-bg)';el.style.color='var(--red-text)'}
+  if(state==='ok'){el.style.background='var(--green-bg)';el.style.color='var(--green-text)';}
+  else if(state==='syncing'){el.style.background='var(--amber-bg)';el.style.color='var(--amber-text)';}
+  else{el.style.background='var(--red-bg)';el.style.color='var(--red-text)';}
   el.textContent=msg;
 }
 
-function ghUpdateStatusUI(msg){
+function fbUpdateStatusUI(msg){
   const el=document.getElementById('gh-status-detail');
-  if(el)el.textContent=msg||'Não configurado.';
+  if(el) el.textContent=msg||'';
+}
+
+/* ── STORAGE (localStorage como cache local, Firebase como fonte de verdade) ── */
+// saveJ with skipSync flag to avoid infinite loop when receiving from Firebase
+const _saveLocal=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+function saveJ(k,v,skipSync=false){
+  _saveLocal(k,v);
+  if(!skipSync) fbAutoSync();
 }
 
 /* ── STATE ── */
@@ -1204,7 +1153,6 @@ function showTab(name,btn){
   btn.classList.add('active');
   if(name==='relatorio')renderRelatorio();
   if(name==='horas')renderHoras();
-  if(name==='config'){ghFillForm();ghUpdateStatusUI(ghCfg?`Configurado para: ${ghCfg.user}/${ghCfg.repo}`:'Não configurado.');}
 }
 
 /* ── EXPORT ── */
@@ -1232,16 +1180,10 @@ updateWeekLabel();
 populateSelects();
 renderCalendar();
 renderAll();
-// GitHub: fill form and auto-load if configured
-ghCfg=loadJ(SK_GH,null);
-ghFillForm();
-if(ghCfg){
-  setSyncStatus('syncing','Carregando do GitHub...');
-  ghFetchFile().then(d=>{
-    if(d){setSyncStatus('ok','Sincronizado');ghUpdateStatusUI(`Carregado em: ${new Date().toLocaleString('pt-BR')}`)}
-    else{setSyncStatus('ok','Conectado');ghUpdateStatusUI('Arquivo data.json ainda não existe no repositório.')}
-  }).catch(e=>{setSyncStatus('err','Erro ao carregar');console.error(e)});
-}
+// Start Firebase (loads SDK then connects)
+setSyncStatus('syncing','Iniciando Firebase...');
+fbInit();
+
 </script>
 </body>
 </html>
