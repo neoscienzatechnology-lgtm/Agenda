@@ -182,7 +182,27 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 .pb-fill{height:100%;border-radius:99px}
 .pb-pct{width:32px;text-align:right;color:var(--text3)}
 
-@media(max-width:600px){header{padding:.65rem 1rem}.main{padding:.75rem .65rem}.stat-value{font-size:17px}}
+/* FECHAMENTO */
+.fech-card{background:var(--surface);border:.5px solid var(--border2);border-radius:var(--radius-lg);padding:1.1rem;margin-bottom:.85rem}
+.fech-card-header{display:flex;align-items:center;gap:10px;margin-bottom:.85rem;flex-wrap:wrap}
+.fech-card-header h4{font-size:13px;font-weight:600;flex:1}
+.fech-card-header .fech-total{font-size:15px;font-weight:700;color:var(--blue-text)}
+.fech-pgto-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.fech-pgto-row label{font-size:12px;color:var(--text2);min-width:90px}
+.fech-pgto-input{font-size:13px;padding:5px 8px;border-radius:var(--radius);border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-family:inherit;width:120px;outline:none}
+.fech-pgto-input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(24,95,165,.12)}
+.fech-status-row{display:flex;align-items:center;gap:8px;margin-top:.6rem;flex-wrap:wrap}
+.fech-saldo{font-size:13px;font-weight:600}
+.fech-saldo.pago{color:var(--green-text)}
+.fech-saldo.parcial{color:var(--amber-text)}
+.fech-saldo.pendente{color:var(--red-text)}
+.btn-whats{padding:5px 12px;background:#25D366;color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:opacity .15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.btn-whats:hover{opacity:.85}
+.btn-link-aluno{padding:5px 12px;background:var(--blue-bg);color:var(--blue-text);border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:opacity .15s}
+.btn-link-aluno:hover{opacity:.8}
+.reposicao-badge{display:inline-block;background:var(--orange-bg,#fff7ed);color:var(--orange-text,#9a3412);font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;margin-left:6px}
+
+
 </style>
 </head>
 <body>
@@ -209,7 +229,8 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     <button class="tab" onclick="showTab('horas',this)">Horas &amp; Valores</button>
     <button class="tab" onclick="showTab('registros',this)">Registros</button>
     <button class="tab" onclick="showTab('relatorio',this)">Relatório</button>
-    <button class="tab" onclick="showTab('config',this)" id="tab-config" style="margin-left:auto">⚙️ GitHub</button>
+    <button class="tab" onclick="showTab('fechamento',this)">💰 Fechamento</button>
+    <button class="tab" onclick="showTab('config',this)" id="tab-config" style="margin-left:auto">⚙️ Firebase</button>
   </div>
 
   <!-- AGENDA -->
@@ -336,6 +357,19 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     <div id="relatorio-content"><div class="empty-state">Selecione um aluno acima.</div></div>
   </div>
 
+  <!-- FECHAMENTO MENSAL -->
+  <div id="section-fechamento" class="section">
+    <div class="section-header">
+      <h2>💰 Fechamento mensal</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text2)">Mês:</label>
+        <select id="fech-mes" onchange="renderFechamento()" style="font-size:13px;padding:5px 9px;border-radius:var(--radius);border:.5px solid var(--border2);background:var(--surface);color:var(--text);font-family:inherit;outline:none"></select>
+      </div>
+    </div>
+    <div class="stats-grid" id="fech-stats"></div>
+    <div id="fech-cards"></div>
+  </div>
+
   <!-- CONFIG / STATUS FIREBASE -->
   <div id="section-config" class="section">
     <div style="max-width:580px">
@@ -400,6 +434,8 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
       </div>
       <div class="form-group"><label>Valor por hora (R$)</label><input type="number" id="m-valor" placeholder="Ex: 50,00" min="0" step="0.01"></div>
       <div class="form-group"><label>Horas/semana</label><input type="number" id="m-horas" placeholder="Ex: 2" min="0" step="0.5"></div>
+      <div class="form-group"><label>Vencimento (dia do mês)</label><input type="number" id="m-venc" placeholder="Ex: 5" min="1" max="31"></div>
+      <div class="form-group"><label>WhatsApp (só números)</label><input type="text" id="m-whats" placeholder="Ex: 11999998888"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-aluno')">Cancelar</button>
@@ -857,6 +893,22 @@ function renderAlerts(){
     if(pct>=0.8&&pct<1)alerts.push({type:'warn',msg:`📋 ${a.nome} completou ${Math.round(pct*100)}% do curso (${feitas.toFixed(1)}h de ${a.ch}h)`});
     if(pct>=1)alerts.push({type:'warn',msg:`✅ ${a.nome} concluiu a carga horária do curso!`});
   });
+  // vencimento próximo ou atrasado
+  const hoje=new Date();
+  const mesAtual=hoje.toISOString().slice(0,7);
+  alunos.filter(a=>a.venc).forEach(a=>{
+    const pgKey=`pgto_${mesAtual}`;
+    const pgData=loadJ(pgKey,{});
+    const pago=parseFloat(pgData[a.nome])||0;
+    const regsM=registros.filter(r=>r.aluno===a.nome&&r.data.startsWith(mesAtual)&&r.status!=='Falta');
+    const vTotal=regsM.reduce((s,r)=>{const d=calcDur(r.inicio,r.fim);const v=r.valor!==''?parseFloat(r.valor):getValorCalc(r.aluno,d);return s+(v===''?0:v);},0);
+    if(vTotal>0&&pago<vTotal){
+      const venc=parseInt(a.venc);
+      const diffDays=venc-hoje.getDate();
+      if(diffDays<=3&&diffDays>=0)alerts.push({type:'warn',msg:`💳 Vencimento de ${a.nome} em ${diffDays===0?'hoje':diffDays+' dia(s)'} (dia ${venc}) — ${fmtM(vTotal-pago)} em aberto`});
+      else if(diffDays<0)alerts.push({type:'danger',msg:`⏰ Pagamento de ${a.nome} venceu há ${Math.abs(diffDays)} dia(s) — ${fmtM(vTotal-pago)} em aberto`});
+    }
+  });
   box.innerHTML=alerts.map(a=>`<div class="alert-item alert-${a.type}">${a.msg}</div>`).join('');
 }
 
@@ -874,8 +926,10 @@ function openModalAluno(id){
     document.getElementById('m-curso').value=a.curso;document.getElementById('m-ch').value=a.ch||'';
     document.getElementById('m-sala').value=a.sala;document.getElementById('m-valor').value=a.valor;
     document.getElementById('m-horas').value=a.horas;
+    document.getElementById('m-venc').value=a.venc||'';
+    document.getElementById('m-whats').value=a.whats||'';
   }else{
-    ['m-mat','m-nome','m-curso','m-ch','m-valor','m-horas'].forEach(f=>document.getElementById(f).value='');
+    ['m-mat','m-nome','m-curso','m-ch','m-valor','m-horas','m-venc','m-whats'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('m-sala').value='VIP 03';
   }
   openModal('modal-aluno');setTimeout(()=>document.getElementById('m-nome').focus(),80);
@@ -883,7 +937,7 @@ function openModalAluno(id){
 function saveAluno(){
   const nome=document.getElementById('m-nome').value.trim();
   if(!nome){alert('Informe o nome.');return}
-  const obj={mat:document.getElementById('m-mat').value.trim(),nome,curso:document.getElementById('m-curso').value.trim(),ch:parseFloat(document.getElementById('m-ch').value)||0,sala:document.getElementById('m-sala').value,valor:document.getElementById('m-valor').value,horas:parseFloat(document.getElementById('m-horas').value)||0};
+  const obj={mat:document.getElementById('m-mat').value.trim(),nome,curso:document.getElementById('m-curso').value.trim(),ch:parseFloat(document.getElementById('m-ch').value)||0,sala:document.getElementById('m-sala').value,valor:document.getElementById('m-valor').value,horas:parseFloat(document.getElementById('m-horas').value)||0,venc:document.getElementById('m-venc').value,whats:document.getElementById('m-whats').value.trim().replace(/\D/g,'')};
   if(editAid)Object.assign(alunos.find(a=>a.id===editAid),obj);
   else alunos.push({id:nextAid++,...obj});
   saveJ(SK_A,alunos);populateSelects();renderAll();closeModal('modal-aluno');
@@ -1131,7 +1185,147 @@ function renderRelatorio(){
     </div>`;
 }
 
-/* ── SELECTS ── */
+/* ── FECHAMENTO MENSAL ── */
+function renderFechamento(){
+  // populate month select
+  const months=[...new Set(registros.map(r=>r.data.slice(0,7)))].sort().reverse();
+  const sel=document.getElementById('fech-mes');
+  const cur=sel.value||months[0]||'';
+  sel.innerHTML=months.map(m=>`<option value="${m}">${m.slice(5)}/${m.slice(0,4)}</option>`).join('');
+  if(cur)sel.value=cur;
+  const mes=sel.value;
+  if(!mes){document.getElementById('fech-cards').innerHTML='<div class="empty-state">Nenhum registro encontrado.</div>';return}
+
+  const regsM=registros.filter(r=>r.data.startsWith(mes));
+  const totalH=regsM.filter(r=>r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
+  const totalV=regsM.filter(r=>r.status!=='Falta').reduce((s,r)=>{
+    const d=calcDur(r.inicio,r.fim);const v=r.valor!==''?parseFloat(r.valor):getValorCalc(r.aluno,d);return s+(v===''?0:v);
+  },0);
+  // load payments for this month
+  const pgKey=`pgto_${mes}`;
+  const pgData=loadJ(pgKey,{});
+  const totalPago=Object.values(pgData).reduce((s,v)=>s+(parseFloat(v)||0),0);
+
+  document.getElementById('fech-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Aulas no mês</div><div class="stat-value">${regsM.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Horas dadas</div><div class="stat-value">${totalH.toFixed(1)}h</div></div>
+    <div class="stat-card"><div class="stat-label">A receber</div><div class="stat-value" style="font-size:16px">${totalV?fmtM(totalV):'—'}</div></div>
+    <div class="stat-card"><div class="stat-label">Pago</div><div class="stat-value" style="font-size:16px;color:var(--green-text)">${fmtM(totalPago)}</div></div>
+    <div class="stat-card"><div class="stat-label">Saldo</div><div class="stat-value" style="font-size:16px;color:${totalV-totalPago>0.01?'var(--red-text)':'var(--green-text)'}">${fmtM(totalV-totalPago)}</div></div>`;
+
+  // per-aluno cards
+  const nomes=[...new Set(regsM.map(r=>r.aluno))].sort();
+  document.getElementById('fech-cards').innerHTML=nomes.map(nome=>{
+    const ar=regsM.filter(r=>r.aluno===nome);
+    const h=ar.filter(r=>r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
+    const pres=ar.filter(r=>r.status==='Presente').length;
+    const faltas=ar.filter(r=>r.status==='Falta').length;
+    const repos=ar.filter(r=>r.status==='Reposição').length;
+    // faltas sem reposição = pendentes
+    const reposPend=registros.filter(r=>r.aluno===nome&&r.status==='Falta'&&
+      !registros.find(r2=>r2.aluno===nome&&r2.status==='Reposição'&&r2.data>=r.data&&r2.data<=mes+'-31')).length;
+    const vTotal=ar.filter(r=>r.status!=='Falta').reduce((s,r)=>{
+      const d=calcDur(r.inicio,r.fim);const v=r.valor!==''?parseFloat(r.valor):getValorCalc(r.aluno,d);return s+(v===''?0:v);
+    },0);
+    const paid=parseFloat(pgData[nome])||0;
+    const saldo=vTotal-paid;
+    const saldoClass=saldo<0.01?'pago':saldo<vTotal?'parcial':'pendente';
+    const saldoTxt=saldo<0.01?'✅ Pago':saldo<vTotal?`⚠️ Parcial (falta ${fmtM(saldo)})`:`❌ Pendente`;
+    const a=alunos.find(x=>x.nome===nome)||{};
+    const whatsLink=a.whats?`<a class="btn-whats" href="https://wa.me/55${a.whats}?text=${encodeURIComponent(`Olá ${nome}! Fechamento ${mes.slice(5)}/${mes.slice(0,4)}: ${pres} aula(s), ${h.toFixed(1)}h, total ${fmtM(vTotal)}. Pago: ${fmtM(paid)}. ${saldo>0.01?'Saldo em aberto: '+fmtM(saldo):'Tudo certo! ✅'}`)}" target="_blank">📲 WhatsApp</a>`:'';
+    const alunoLink=`<button class="btn-link-aluno" onclick="copyAlunoLink('${encodeURIComponent(nome)}')">🔗 Link do aluno</button>`;
+    return`<div class="fech-card">
+      <div class="fech-card-header">
+        <h4>${nome} ${reposPend>0?`<span class="reposicao-badge">${reposPend} repos. pendente${reposPend>1?'s':''}</span>`:''}</h4>
+        <span class="fech-total">${vTotal?fmtM(vTotal):'—'}</span>
+        ${whatsLink} ${alunoLink}
+      </div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text2);margin-bottom:.75rem;flex-wrap:wrap">
+        <span>🕐 ${h.toFixed(1)}h</span>
+        <span>✅ ${pres} presente${pres!==1?'s':''}</span>
+        <span>❌ ${faltas} falta${faltas!==1?'s':''}</span>
+        ${repos?`<span>🔄 ${repos} reposição</span>`:''}
+      </div>
+      <div class="fech-pgto-row">
+        <label>Valor pago (R$):</label>
+        <input class="fech-pgto-input" type="number" min="0" step="0.01" placeholder="0,00"
+          value="${paid||''}" 
+          oninput="savePgto('${pgKey}','${nome}',this.value)"
+          id="pgto_${mes}_${nome.replace(/\s/g,'_')}">
+        <select class="fech-pgto-input" style="width:100px" onchange="savePgtoForm('${pgKey}','${nome}',this.value)">
+          <option value="">Forma</option><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option>
+        </select>
+      </div>
+      <div class="fech-status-row">
+        <span class="fech-saldo ${saldoClass}">${saldoTxt}</span>
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty-state">Nenhum aluno com registros neste mês.</div>';
+}
+
+function savePgto(pgKey,nome,val){
+  const d=loadJ(pgKey,{});
+  d[nome]=parseFloat(val)||0;
+  saveJ(pgKey,d);
+  renderFechamento();
+}
+function savePgtoForm(pgKey,nome,forma){
+  const fKey=pgKey+'_forma';
+  const d=loadJ(fKey,{});
+  d[nome]=forma;
+  saveJ(fKey,d);
+}
+
+/* ── LINK DO ALUNO ── */
+function copyAlunoLink(nomeEnc){
+  const url=window.location.href.split('?')[0]+'?aluno='+nomeEnc;
+  navigator.clipboard.writeText(url).then(()=>{
+    alert('Link copiado!\n'+url+'\n\nMande para o aluno — ele verá apenas os próprios horários e presenças.');
+  }).catch(()=>prompt('Copie o link:',url));
+}
+
+function checkAlunoView(){
+  const params=new URLSearchParams(window.location.search);
+  const aluno=params.get('aluno');
+  if(!aluno)return;
+  const nome=decodeURIComponent(aluno);
+  // hide everything except aluno view
+  document.querySelector('.main').innerHTML=renderAlunoPublico(nome);
+}
+
+function renderAlunoPublico(nome){
+  const a=alunos.find(x=>x.nome===nome)||{nome,curso:'',ch:0,sala:'VIP 03'};
+  const regs=registros.filter(r=>r.aluno===nome).sort((a,b)=>b.data.localeCompare(a.data));
+  const tH=regs.filter(r=>r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
+  const pres=regs.filter(r=>r.status==='Presente').length;
+  const faltas=regs.filter(r=>r.status==='Falta').length;
+  const taxa=regs.length?Math.round(pres/regs.length*100):100;
+  const pct=a.ch>0?Math.min(100,Math.round(tH/a.ch*100)):null;
+  return`<div style="max-width:540px;margin:2rem auto;padding:0 1rem">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem">
+      <div style="width:42px;height:42px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--blue-text)">${nome[0]}</div>
+      <div><div style="font-size:16px;font-weight:600">${nome}</div><div style="font-size:12px;color:var(--text3)">${a.curso}</div></div>
+    </div>
+    <div class="stats-grid" style="margin-bottom:1.25rem">
+      <div class="stat-card"><div class="stat-label">Aulas</div><div class="stat-value">${regs.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Horas</div><div class="stat-value">${tH.toFixed(1)}h</div></div>
+      <div class="stat-card"><div class="stat-label">Presença</div><div class="stat-value">${taxa}%</div></div>
+      <div class="stat-card"><div class="stat-label">Faltas</div><div class="stat-value" style="color:var(--red-text)">${faltas}</div></div>
+    </div>
+    ${pct!==null?`<div style="font-size:12px;color:var(--text3);margin-bottom:4px">Progresso: ${tH.toFixed(1)}h de ${a.ch}h (${pct}%)</div>
+    <div class="progress-bar" style="margin-bottom:1.25rem"><div class="progress-fill" style="width:${pct}%"></div></div>`:''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Data</th><th>Horário</th><th>Status</th></tr></thead>
+      <tbody>${regs.slice(0,20).map(r=>{
+        const sc=r.status==='Presente'?'badge-success':r.status==='Falta'?'badge-danger':'badge-warning';
+        return`<tr><td>${fmtDate(r.data)}</td><td class="mat">${r.inicio}–${r.fim}</td><td><span class="badge ${sc}">${r.status}</span></td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <div style="text-align:center;margin-top:1.5rem;font-size:11px;color:var(--text3)">Controle de Horas — Engº Will</div>
+  </div>`;
+}
+
+
 function populateSelects(){
   const opts=alunos.map(a=>`<option>${a.nome}</option>`).join('');
   document.getElementById('reg-aluno').innerHTML=opts;
@@ -1147,6 +1341,7 @@ function showTab(name,btn){
   btn.classList.add('active');
   if(name==='relatorio')renderRelatorio();
   if(name==='horas')renderHoras();
+  if(name==='fechamento'){updateMonthFilter();renderFechamento();}
 }
 
 /* ── EXPORT ── */
@@ -1172,11 +1367,19 @@ document.getElementById('reg-fim').value='16:30';
 document.getElementById('header-date').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
 updateWeekLabel();
 populateSelects();
+// Check if aluno view mode (?aluno=...)
+const _params=new URLSearchParams(window.location.search);
+if(_params.get('aluno')){
+  // Show loading, then render after Firebase loads
+  document.querySelector('.main').innerHTML='<div class="empty-state">Carregando...</div>';
+}
 renderCalendar();
 renderAll();
-// Start Firebase (loads SDK then connects)
+// Start Firebase
 setSyncStatus('syncing','Iniciando Firebase...');
 fbInit();
+// After Firebase loads, check aluno view
+setTimeout(()=>{if(_params.get('aluno'))checkAlunoView();},2500);
 
 </script>
 </body>
