@@ -398,6 +398,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
         <div class="btn-row">
           <button class="btn-primary" onclick="fbPush('manual')">⬆ Forçar envio agora</button>
           <button class="btn-secondary" onclick="fbListen()">🔄 Reconectar listener</button>
+          <button class="btn-secondary" onclick="fbResetToDefault()" style="color:var(--red-text);border-color:var(--red-bg)">🔁 Resetar agenda (PDF)</button>
         </div>
       </div>
 
@@ -494,7 +495,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 <script>
 /* ── CONSTANTS ── */
 const DAYS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-const TIMES_START=16,TIMES_END=42,SLOT_PX=28;
+const TIMES_START=16,TIMES_END=42,SLOT_PX=30;
 const TOTAL_SLOTS=TIMES_END-TIMES_START;
 const CAL_HEIGHT=TOTAL_SLOTS*SLOT_PX;
 const timeToSlot=t=>{const[h,m]=t.split(':').map(Number);return h*2+(m>=30?1:0)};
@@ -548,24 +549,25 @@ function fbStart(){
 
 function fbListen(){
   if(!fbDb) return;
-  // Unsubscribe previous listeners
   fbUnsubscribes.forEach(u=>u());
   fbUnsubscribes=[];
-
   const docRef=fbDb.collection('agenda').doc('dados');
-
   const unsub=docRef.onSnapshot(snap=>{
     if(!snap.exists){
-      // First time — push default data
+      // First time — push the correct default data (not stale localStorage)
+      events=getDefaultEvents();
+      alunos=getDefaultAlunos();
+      registros=getDefaultRegs();
       fbPush('init');
+      populateSelects(); renderCalendar(); renderAll();
       return;
     }
     const d=snap.data();
     let changed=false;
-    if(d.events!==undefined){events=d.events; saveJ(SK_EV,events,true); changed=true;}
-    if(d.alunos!==undefined){alunos=d.alunos; saveJ(SK_A,alunos,true); changed=true;}
-    if(d.registros!==undefined){registros=d.registros; saveJ(SK_R,registros,true); changed=true;}
-    if(d.config!==undefined){config=d.config; saveJ(SK_C,config,true); changed=true;}
+    if(d.events!==undefined){events=d.events; _saveLocal(SK_EV,events); changed=true;}
+    if(d.alunos!==undefined){alunos=d.alunos; _saveLocal(SK_A,alunos); changed=true;}
+    if(d.registros!==undefined){registros=d.registros; _saveLocal(SK_R,registros); changed=true;}
+    if(d.config!==undefined){config=d.config; _saveLocal(SK_C,config); changed=true;}
     if(changed){
       nextEvId=events.length?Math.max(...events.map(e=>e.id))+1:100;
       nextAid=alunos.length?Math.max(...alunos.map(a=>a.id))+1:20;
@@ -578,8 +580,30 @@ function fbListen(){
     setSyncStatus('err','Erro de conexão');
     console.error('Firestore listener error',err);
   });
-
   fbUnsubscribes.push(unsub);
+}
+
+async function fbResetToDefault(){
+  if(!confirm('⚠️ Isso vai apagar todos os dados do Firebase e carregar a agenda do PDF.\n\nTem certeza?')) return;
+  // Clear localStorage
+  [SK_EV,SK_A,SK_R,SK_C].forEach(k=>localStorage.removeItem(k));
+  // Load fresh defaults
+  events=getDefaultEvents();
+  alunos=getDefaultAlunos();
+  registros=getDefaultRegs();
+  config={valorHora:''};
+  // Delete Firestore doc and recreate
+  if(fbDb){
+    try{
+      await fbDb.collection('agenda').doc('dados').delete();
+    }catch(e){}
+    await fbPush('reset');
+  }
+  nextEvId=Math.max(...events.map(e=>e.id))+1;
+  nextAid=Math.max(...alunos.map(a=>a.id))+1;
+  nextRid=1;
+  populateSelects(); renderCalendar(); renderAll();
+  alert('✅ Agenda resetada com os dados do PDF!');
 }
 
 async function fbPush(source='auto'){
