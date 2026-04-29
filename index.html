@@ -58,12 +58,12 @@ header .sub{font-size:12px;color:var(--text3);margin-left:auto}
 .week-nav{background:var(--surface);border:.5px solid var(--border2);border-radius:var(--radius);padding:5px 12px;cursor:pointer;font-size:13px;font-family:inherit;color:var(--text2);transition:all .15s}
 .week-nav:hover{background:var(--surface2);color:var(--text)}
 .cal-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.cal-outer{min-width:680px;position:relative}
+.cal-outer{min-width:680px}
 .cal-header{display:grid;grid-template-columns:52px repeat(6,1fr);border:.5px solid var(--border2);border-radius:var(--radius-lg) var(--radius-lg) 0 0;overflow:hidden;background:var(--surface2)}
 .cal-header-cell{padding:8px 4px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);border-right:.5px solid var(--border)}
 .cal-header-cell:last-child{border-right:none}
 .cal-header-cell .hdate{font-size:10px;color:var(--text3);font-weight:400}
-.cal-header-cell.today-col{background:var(--blue-bg);color:var(--blue-text);box-shadow:inset 0 -2px 0 var(--blue)}
+.cal-header-cell.today-col{background:var(--blue-bg);color:var(--blue-text)}
 .cal-header-cell.today-col .hdate{color:var(--blue-text);opacity:.75}
 .cal-body{display:grid;grid-template-columns:52px repeat(6,1fr);border:.5px solid var(--border2);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg);overflow:hidden;background:var(--border)}
 .cal-time-col{display:flex;flex-direction:column;background:var(--surface2)}
@@ -71,16 +71,16 @@ header .sub{font-size:12px;color:var(--text3);margin-left:auto}
 .cal-time-slot.hour{color:var(--text2);font-size:10px}
 .cal-day-col{position:relative;background:var(--surface);border-right:.5px solid var(--border)}
 .cal-day-col:last-child{border-right:none}
-.cal-day-col.today-day{background:rgba(24,95,165,.03)}
+.cal-day-col.today-day{background:rgba(24,95,165,.02)}
 .cal-bg-slot{position:absolute;left:0;right:0;height:var(--slot);border-bottom:.5px solid var(--border);box-sizing:border-box;cursor:pointer;transition:background .1s}
 .cal-bg-slot.hour{border-bottom:.5px solid var(--border2)}
 .cal-bg-slot:hover{background:rgba(24,95,165,.06)}
 .cal-bg-slot.drop-active{background:rgba(24,95,165,.12) !important}
-.cal-event{position:absolute;border-radius:5px;padding:3px 5px;font-size:10px;cursor:grab;user-select:none;overflow:hidden;z-index:10;display:flex;flex-direction:column;gap:1px;border:.5px solid rgba(0,0,0,.08);transition:box-shadow .15s}
+.cal-event{position:absolute;left:2px;right:2px;border-radius:5px;padding:3px 5px;font-size:10px;cursor:grab;user-select:none;overflow:hidden;z-index:10;display:flex;flex-direction:column;gap:1px;border:.5px solid rgba(0,0,0,.08)}
 .cal-event:hover{z-index:20;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .cal-event:active{cursor:grabbing}
 .cal-event.dragging-ev{opacity:.35;pointer-events:none}
-.cal-event.ghost{opacity:.92;box-shadow:0 6px 20px rgba(0,0,0,.22);z-index:999;pointer-events:none;position:fixed;transition:left .05s,top .05s}
+.cal-event.ghost{opacity:.92;box-shadow:0 6px 20px rgba(0,0,0,.22);z-index:999;pointer-events:none;position:fixed}
 .cal-event .ev-name{font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cal-event .ev-course{font-size:9px;opacity:.72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cal-event .ev-time{font-size:9px;opacity:.55;margin-top:auto;white-space:nowrap}
@@ -95,10 +95,6 @@ header .sub{font-size:12px;color:var(--text3);margin-left:auto}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
 .legend-dot{width:11px;height:11px;border-radius:3px}
 .cal-hint{font-size:11px;color:var(--text3);margin-bottom:.6rem}
-
-/* Now line */
-.now-line{position:absolute;left:0;right:0;height:2px;background:#E53E3E;z-index:50;pointer-events:none;opacity:.8}
-.now-line::before{content:'';position:absolute;left:-5px;top:-4px;width:10px;height:10px;background:#E53E3E;border-radius:50%}
 
 /* TABLE */
 .table-wrap{overflow-x:auto;border-radius:var(--radius-lg);border:.5px solid var(--border)}
@@ -179,6 +175,12 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 .report-stat{background:var(--surface2);border-radius:var(--radius);padding:.6rem .75rem}
 .report-stat .rs-label{font-size:10px;color:var(--text3);margin-bottom:2px}
 .report-stat .rs-val{font-size:15px;font-weight:600;color:var(--text)}
+.presenca-bars{margin-top:.5rem}
+.pb-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px}
+.pb-name{width:110px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.pb-track{flex:1;height:10px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.pb-fill{height:100%;border-radius:99px}
+.pb-pct{width:32px;text-align:right;color:var(--text3)}
 
 @media(max-width:600px){header{padding:.65rem 1rem}.main{padding:.75rem .65rem}.stat-value{font-size:17px}}
 </style>
@@ -197,6 +199,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
   </svg>
   <h1>Controle de Horas</h1>
   <span class="sub" id="header-date"></span>
+  <span id="sync-status" style="font-size:11px;padding:3px 10px;border-radius:99px;display:none"></span>
 </header>
 
 <div class="main">
@@ -206,6 +209,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     <button class="tab" onclick="showTab('horas',this)">Horas &amp; Valores</button>
     <button class="tab" onclick="showTab('registros',this)">Registros</button>
     <button class="tab" onclick="showTab('relatorio',this)">Relatório</button>
+    <button class="tab" onclick="showTab('config',this)" id="tab-config" style="margin-left:auto">⚙️ GitHub</button>
   </div>
 
   <!-- AGENDA -->
@@ -216,7 +220,6 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
       <button class="week-nav" onclick="changeWeek(-1)">&#8592; Semana anterior</button>
       <h2 id="week-label"></h2>
       <button class="week-nav" onclick="changeWeek(1)">Próxima semana &#8594;</button>
-      <button class="btn-secondary" onclick="changeWeek(0)">Hoje</button>
       <button class="btn-primary" onclick="openModalEv(null,-1,-1)">+ Novo evento</button>
     </div>
     <div class="legend">
@@ -226,7 +229,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     </div>
     <p class="cal-hint">Arraste para mover · Clique num horário vazio para adicionar · ✏️ editar · ⧉ duplicar · ✕ excluir</p>
     <div class="cal-wrap">
-      <div class="cal-outer" id="cal-outer">
+      <div class="cal-outer">
         <div class="cal-header" id="cal-header"></div>
         <div class="cal-body" id="cal-body"></div>
       </div>
@@ -249,7 +252,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th style="width:24px"></th><th>Mat.</th><th>Aluno</th><th>Curso</th><th>Progresso</th><th>Sala</th><th>Valor/h</th><th>H/sem</th><th></th></tr></thead>
+        <thead><tr><th style="width:24px"></th><th>Mat.</th><th>Aluno</th><th>Curso</th><th>C.H. Total</th><th>Sala</th><th>Valor/h</th><th>H/sem</th><th></th></tr></thead>
         <tbody id="alunos-tbody"></tbody>
       </table>
     </div>
@@ -307,8 +310,6 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
       </select>
       <label>Mês:</label>
       <select id="filter-reg-mes" onchange="renderRegistros()"><option value="">Todos</option></select>
-      <label>Obs:</label>
-      <input type="text" id="filter-reg-obs" placeholder="Buscar obs..." oninput="renderRegistros()" style="width:130px">
       <button class="btn-secondary" onclick="exportCSV()" style="margin-left:auto">Exportar CSV</button>
     </div>
     <div class="table-wrap">
@@ -407,7 +408,57 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
       <button class="btn-primary" onclick="saveEditRegistro()">Salvar</button>
     </div>
   </div>
-</div>
+  <!-- CONFIG GITHUB -->
+  <div id="section-config" class="section">
+    <div class="section-header"><h2>Sincronização com GitHub</h2></div>
+    <div style="max-width:580px">
+      <div class="add-form">
+        <h3>🔐 Configurar repositório</h3>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.7">Os dados (agenda, alunos, registros) são salvos no arquivo <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px">data.json</code> do seu repositório. Cada edição faz um commit automático.</p>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group"><label>Usuário GitHub</label><input type="text" id="gh-user" placeholder="Ex: williamsilva" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Nome do repositório</label><input type="text" id="gh-repo" placeholder="Ex: controle-horas" autocomplete="off" spellcheck="false"></div>
+          <div class="form-group"><label>Branch</label><input type="text" id="gh-branch" placeholder="main" value="main"></div>
+          <div class="form-group"><label>Caminho do arquivo</label><input type="text" id="gh-path" placeholder="data.json" value="data.json"></div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Personal Access Token (Fine-grained ou Classic)</label>
+            <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="new-password" spellcheck="false">
+            <span class="hint-text" style="margin-top:3px">GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repo → <b>Contents: Read &amp; write</b></span>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="ghSaveConfig()">💾 Salvar configuração</button>
+          <button class="btn-secondary" onclick="ghTestAndLoad()">🔌 Testar conexão</button>
+          <span id="gh-test-result" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <div class="add-form" style="margin-top:.75rem">
+        <h3>📡 Sincronização</h3>
+        <div id="gh-status-detail" class="hint-text" style="margin-bottom:1rem">Configure acima para ativar.</div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="ghPush('manual')">⬆ Enviar dados agora</button>
+          <button class="btn-secondary" onclick="ghPull()">⬇ Carregar do GitHub</button>
+          <button class="btn-secondary" onclick="ghClearConfig()" style="color:var(--red-text);border-color:var(--red-bg)">Desconectar</button>
+        </div>
+      </div>
+
+      <div class="add-form" style="margin-top:.75rem">
+        <h3>📋 Passo a passo</h3>
+        <ol style="font-size:12px;color:var(--text2);line-height:2.1;padding-left:1.2rem">
+          <li>Crie um repositório no GitHub (ex: <b>controle-horas</b>)</li>
+          <li>Suba o <code style="background:var(--surface2);padding:1px 4px;border-radius:3px">index.html</code> na raiz do repositório</li>
+          <li>Ative GitHub Pages: Settings → Pages → Source: Deploy from branch → main</li>
+          <li>Gere um token: Settings → Developer settings → Personal access tokens → Fine-grained → New token → selecione o repositório → Contents: Read &amp; write → Generate</li>
+          <li>Preencha os campos acima e clique em <b>Salvar configuração</b></li>
+          <li>Clique em <b>Testar conexão</b> — se aparecer ✅ está tudo certo</li>
+          <li>A partir daí cada alteração salva automaticamente no GitHub 🎉</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.main -->
 
 <script>
 /* ── CONSTANTS ── */
@@ -421,8 +472,156 @@ const slotToY=s=>(s-TIMES_START)*SLOT_PX;
 
 /* ── STORAGE ── */
 const SK_EV='ctrl2_ev',SK_R='ctrl2_reg',SK_A='ctrl2_alunos',SK_C='ctrl2_cfg',SK_WK='ctrl2_week';
+const SK_GH='ctrl2_gh'; // github config storage key
 const loadJ=(k,d)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):d}catch(e){return d}};
-const saveJ=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const saveJ=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}; ghAutoSync();};
+
+/* ── GITHUB SYNC ── */
+let ghCfg=loadJ(SK_GH,null);
+let ghSyncTimer=null;
+let ghFileSha=null; // current SHA of data.json on GitHub
+
+function ghGetCfg(){return loadJ(SK_GH,null)}
+
+function ghSaveConfig(){
+  const user=document.getElementById('gh-user').value.trim();
+  const repo=document.getElementById('gh-repo').value.trim();
+  const token=document.getElementById('gh-token').value.trim();
+  const branch=document.getElementById('gh-branch').value.trim()||'main';
+  const path=document.getElementById('gh-path').value.trim()||'data.json';
+  if(!user||!repo||!token){alert('Preencha usuário, repositório e token.');return}
+  ghCfg={user,repo,token,branch,path};
+  localStorage.setItem(SK_GH,JSON.stringify(ghCfg));
+  ghUpdateStatusUI('Configuração salva. Testando conexão...');
+  ghTestAndLoad();
+}
+
+function ghClearConfig(){
+  if(!confirm('Desconectar do GitHub? Os dados locais são mantidos.'))return;
+  localStorage.removeItem(SK_GH);
+  ghCfg=null;ghFileSha=null;
+  ghUpdateStatusUI(null);
+  ghFillForm();
+}
+
+function ghFillForm(){
+  if(!ghCfg)return;
+  document.getElementById('gh-user').value=ghCfg.user||'';
+  document.getElementById('gh-repo').value=ghCfg.repo||'';
+  document.getElementById('gh-branch').value=ghCfg.branch||'main';
+  document.getElementById('gh-path').value=ghCfg.path||'data.json';
+  // don't prefill token for security
+}
+
+function ghApiUrl(){
+  const c=ghCfg;if(!c)return null;
+  return `https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}?ref=${c.branch}`;
+}
+
+async function ghFetch(method,body=null){
+  const c=ghCfg;if(!c)return null;
+  const url=`https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}`;
+  const opts={method,headers:{'Authorization':`Bearer ${c.token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}};
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(url,opts);
+  if(!res.ok){const t=await res.text();throw new Error(`GitHub API ${res.status}: ${t}`)}
+  return res.json();
+}
+
+async function ghTestAndLoad(){
+  const el=document.getElementById('gh-test-result');
+  el.textContent='⏳ Testando...';el.style.color='var(--text3)';
+  setSyncStatus('syncing','Conectando...');
+  try{
+    const data=await ghFetchFile();
+    if(data){
+      el.textContent='✅ Conectado! Dados carregados do GitHub.';el.style.color='var(--green-text)';
+      ghUpdateStatusUI('Conectado e sincronizado.');
+    }else{
+      el.textContent='✅ Conectado! Repositório acessível (arquivo data.json ainda não existe — será criado no primeiro save).';el.style.color='var(--green-text)';
+      ghUpdateStatusUI('Conectado. Aguardando primeiro save.');
+    }
+    setSyncStatus('ok','Sincronizado');
+  }catch(e){
+    el.textContent='❌ Erro: '+e.message;el.style.color='var(--red-text)';
+    setSyncStatus('err','Erro de conexão');
+    ghUpdateStatusUI('Erro: '+e.message);
+  }
+}
+
+async function ghFetchFile(){
+  const c=ghCfg;if(!c)return null;
+  try{
+    const url=`https://api.github.com/repos/${c.user}/${c.repo}/contents/${c.path}?ref=${c.branch}&t=${Date.now()}`;
+    const res=await fetch(url,{headers:{'Authorization':`Bearer ${c.token}`,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
+    if(res.status===404)return null;
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const json=await res.json();
+    ghFileSha=json.sha;
+    const decoded=JSON.parse(atob(json.content.replace(/\n/g,'')));
+    // load into app state
+    if(decoded.events!==undefined){events=decoded.events;saveJ(SK_EV,events)}
+    if(decoded.alunos!==undefined){alunos=decoded.alunos;saveJ(SK_A,alunos)}
+    if(decoded.registros!==undefined){registros=decoded.registros;saveJ(SK_R,registros)}
+    if(decoded.config!==undefined){config=decoded.config;saveJ(SK_C,config)}
+    nextEvId=events.length?Math.max(...events.map(e=>e.id))+1:100;
+    nextAid=alunos.length?Math.max(...alunos.map(a=>a.id))+1:20;
+    nextRid=registros.length?Math.max(...registros.map(r=>r.id))+1:20;
+    populateSelects();renderCalendar();renderAll();
+    return decoded;
+  }catch(e){if(e.message.includes('404'))return null;throw e}
+}
+
+async function ghPush(source='auto'){
+  const c=ghCfg;if(!c)return;
+  setSyncStatus('syncing','Salvando...');
+  try{
+    const payload={events,alunos,registros,config,savedAt:new Date().toISOString()};
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
+    const body={message:`[controle-horas] update ${new Date().toLocaleString('pt-BR')}`,content,branch:c.branch};
+    if(ghFileSha)body.sha=ghFileSha;
+    const res=await ghFetch('PUT',body);
+    ghFileSha=res.content.sha;
+    setSyncStatus('ok','Salvo no GitHub ✓');
+    ghUpdateStatusUI(`Último sync: ${new Date().toLocaleString('pt-BR')}`);
+  }catch(e){
+    setSyncStatus('err','Erro ao salvar');
+    ghUpdateStatusUI('Erro ao salvar: '+e.message);
+    console.error('ghPush error',e);
+  }
+}
+
+async function ghPull(){
+  const c=ghCfg;if(!c){alert('Configure o GitHub primeiro.');return}
+  setSyncStatus('syncing','Carregando...');
+  try{
+    const data=await ghFetchFile();
+    if(data){setSyncStatus('ok','Dados carregados ✓');ghUpdateStatusUI(`Carregado em: ${new Date().toLocaleString('pt-BR')}`)}
+    else{setSyncStatus('ok','Arquivo não encontrado no repo ainda.');ghUpdateStatusUI('Arquivo ainda não existe no repositório.')}
+  }catch(e){setSyncStatus('err','Erro ao carregar');console.error(e)}
+}
+
+// debounced auto-push: waits 1.5s after last change
+function ghAutoSync(){
+  if(!ghCfg)return;
+  clearTimeout(ghSyncTimer);
+  ghSyncTimer=setTimeout(()=>ghPush('auto'),1500);
+}
+
+function setSyncStatus(state,msg){
+  const el=document.getElementById('sync-status');
+  if(!ghCfg){el.style.display='none';return}
+  el.style.display='inline-block';
+  if(state==='ok'){el.style.background='var(--green-bg)';el.style.color='var(--green-text)'}
+  else if(state==='syncing'){el.style.background='var(--amber-bg)';el.style.color='var(--amber-text)'}
+  else{el.style.background='var(--red-bg)';el.style.color='var(--red-text)'}
+  el.textContent=msg;
+}
+
+function ghUpdateStatusUI(msg){
+  const el=document.getElementById('gh-status-detail');
+  if(el)el.textContent=msg||'Não configurado.';
+}
 
 /* ── STATE ── */
 let weekOffset=loadJ(SK_WK,0);
@@ -509,13 +708,7 @@ function getWeekStart(offset){
   mon.setHours(0,0,0,0);
   return mon;
 }
-function changeWeek(dir){
-  if(dir===0){weekOffset=0;}
-  else{weekOffset+=dir;}
-  saveJ(SK_WK,weekOffset);
-  renderCalendar();
-  updateWeekLabel();
-}
+function changeWeek(dir){weekOffset+=dir;saveJ(SK_WK,weekOffset);renderCalendar();updateWeekLabel()}
 function updateWeekLabel(){
   const ws=getWeekStart(weekOffset);
   const we=new Date(ws);we.setDate(ws.getDate()+5);
@@ -528,7 +721,7 @@ function getWeekDates(){
 }
 function isToday(date){const t=new Date();return date.toDateString()===t.toDateString()}
 
-/* ── CALENDAR RENDERING ── */
+/* ── CALENDAR ── */
 function renderCalendar(){
   buildCalHeader();
   buildCalBody();
@@ -545,13 +738,6 @@ function buildCalBody(){
   const body=document.getElementById('cal-body');
   body.innerHTML='';
   const dates=getWeekDates();
-  const now=new Date();
-  const currentDayIndex = dates.findIndex(d => isToday(d));
-  let nowSlot = null;
-  if (currentDayIndex !== -1) {
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    nowSlot = Math.floor(nowMinutes / 30);
-  }
 
   // Time column
   const tc=document.createElement('div');
@@ -586,75 +772,21 @@ function buildCalBody(){
       col.appendChild(bg);
     }
 
-    // Now line
-    if (d === currentDayIndex && nowSlot >= TIMES_START && nowSlot < TIMES_END) {
-      const line = document.createElement('div');
-      line.className = 'now-line';
-      line.style.top = ((nowSlot - TIMES_START) * SLOT_PX) + 'px';
-      col.appendChild(line);
-    }
-
-    // Layout events with collision detection
-    const dayEvents = events.filter(e=>e.day===d);
-    const positionedEvents = layoutEvents(dayEvents);
-    positionedEvents.forEach(({ev, left, width}) => {
-      const el = createEventEl(ev, left, width);
-      col.appendChild(el);
+    // events
+    events.filter(e=>e.day===d).forEach(ev=>{
+      col.appendChild(createEventEl(ev));
     });
 
     body.appendChild(col);
   }
-
-  // Scroll to now line if today is visible
-  if (currentDayIndex !== -1 && nowSlot >= TIMES_START && nowSlot < TIMES_END) {
-    setTimeout(() => {
-      const nowLine = document.querySelector('.now-line');
-      if (nowLine) nowLine.scrollIntoView({block:'center', behavior:'smooth'});
-    }, 100);
-  }
 }
 
-/* Collision-aware event layout */
-function layoutEvents(evs) {
-  if (!evs.length) return [];
-  const sorted = [...evs].sort((a,b) => a.startSlot - b.startSlot || a.endSlot - b.endSlot);
-  const groups = [];
-  for (const ev of sorted) {
-    let placed = false;
-    for (const group of groups) {
-      if (group[group.length-1].endSlot <= ev.startSlot) {
-        group.push(ev); placed = true; break;
-      }
-    }
-    if (!placed) groups.push([ev]);
-  }
-  const result = [];
-  for (const group of groups) {
-    const cols = [];
-    for (const ev of group) {
-      let col = 0;
-      while (col < cols.length && cols[col][cols[col].length-1].endSlot > ev.startSlot) col++;
-      if (col === cols.length) cols.push([]);
-      cols[col].push(ev);
-    }
-    const numCols = cols.length;
-    for (let c = 0; c < numCols; c++) {
-      for (const ev of cols[c]) {
-        const left = (c / numCols) * 100;
-        const width = (1 / numCols) * 100 - 1; // 1% gap
-        result.push({ev, left, width});
-      }
-    }
-  }
-  return result;
-}
-
-function createEventEl(ev, leftPercent = 0, widthPercent = 96){
+function createEventEl(ev){
   const top=slotToY(ev.startSlot);
   const height=Math.max((ev.endSlot-ev.startSlot)*SLOT_PX-2,18);
   const el=document.createElement('div');
   el.className='cal-event '+salaClass(ev.sala);
-  el.style.cssText=`top:${top}px;height:${height}px;left:${leftPercent}%;width:${widthPercent}%`;
+  el.style.cssText=`top:${top}px;height:${height}px`;
   el.dataset.evid=ev.id;
   el.innerHTML=`
     <span class="ev-name">${ev.label}</span>
@@ -670,7 +802,7 @@ function createEventEl(ev, leftPercent = 0, widthPercent = 96){
   return el;
 }
 
-/* ── DRAG & DROP ── */
+/* ── DRAG ── */
 let dragEv=null,ghost=null,dragOX=0,dragOY=0;
 
 function startDrag(e,ev,el){
@@ -758,6 +890,7 @@ function deleteEv(id){
 function duplicateEv(id){
   const ev=events.find(e=>e.id===id);
   const copy={...ev,id:nextEvId++};
+  // shift one day if possible, else same day
   copy.day=(ev.day+1)%6;
   events.push(copy);
   saveJ(SK_EV,events);renderCalendar();
@@ -767,6 +900,7 @@ function duplicateEv(id){
 function renderAlerts(){
   const box=document.getElementById('alerts-box');
   const alerts=[];
+  // faltas consecutivas >= 2
   const nomes=[...new Set(registros.map(r=>r.aluno))];
   nomes.forEach(nome=>{
     const regs=registros.filter(r=>r.aluno===nome).sort((a,b)=>a.data.localeCompare(b.data));
@@ -774,6 +908,7 @@ function renderAlerts(){
     regs.forEach(r=>{if(r.status==='Falta'){consec++;max=Math.max(max,consec)}else consec=0});
     if(max>=2)alerts.push({type:'danger',msg:`⚠️ ${nome} tem ${max} falta(s) consecutiva(s)`});
   });
+  // alunos próximos de concluir (>= 80%)
   alunos.filter(a=>a.ch>0).forEach(a=>{
     const feitas=registros.filter(r=>r.aluno===a.nome&&r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
     const pct=feitas/a.ch;
@@ -919,6 +1054,7 @@ function renderAlunos(){
 
 function renderHoras(){
   document.getElementById('valor-hora-padrao').value=config.valorHora||'';
+  // Monthly chart
   const byMonth={};
   registros.filter(r=>r.status!=='Falta').forEach(r=>{
     const m=r.data.slice(0,7);
@@ -962,6 +1098,7 @@ function updateMonthFilter(){
   const cur=sel.value;
   sel.innerHTML='<option value="">Todos os meses</option>'+months.map(m=>`<option value="${m}">${m.slice(5)}/${m.slice(0,4)}</option>`).join('');
   if(months.includes(cur))sel.value=cur;
+  // relatório months
   const rsel=document.getElementById('rel-mes');
   const rcur=rsel.value;
   rsel.innerHTML='<option value="">Todo período</option>'+months.map(m=>`<option value="${m}">${m.slice(5)}/${m.slice(0,4)}</option>`).join('');
@@ -972,13 +1109,7 @@ function renderRegistros(){
   const fa=document.getElementById('filter-reg-aluno').value;
   const fs=document.getElementById('filter-reg-status').value;
   const fm=document.getElementById('filter-reg-mes').value;
-  const fobs=(document.getElementById('filter-reg-obs').value||'').toLowerCase();
-  const list=registros.filter(r=>
-    (!fa||r.aluno===fa) &&
-    (!fs||r.status===fs) &&
-    (!fm||r.data.startsWith(fm)) &&
-    (!fobs||(r.obs||'').toLowerCase().includes(fobs))
-  );
+  const list=registros.filter(r=>(!fa||r.aluno===fa)&&(!fs||r.status===fs)&&(!fm||r.data.startsWith(fm)));
   if(!list.length){document.getElementById('registros-tbody').innerHTML=`<tr><td colspan="11" class="empty-state">Nenhum registro.</td></tr>`;return}
   document.getElementById('registros-tbody').innerHTML=list.map(r=>{
     const dur=calcDur(r.inicio,r.fim);
@@ -1074,6 +1205,7 @@ function showTab(name,btn){
   btn.classList.add('active');
   if(name==='relatorio')renderRelatorio();
   if(name==='horas')renderHoras();
+  if(name==='config'){ghFillForm();ghUpdateStatusUI(ghCfg?`Configurado para: ${ghCfg.user}/${ghCfg.repo}`:'Não configurado.');}
 }
 
 /* ── EXPORT ── */
@@ -1081,14 +1213,7 @@ function exportCSV(){
   const fa=document.getElementById('filter-reg-aluno').value;
   const fs=document.getElementById('filter-reg-status').value;
   const fm=document.getElementById('filter-reg-mes').value;
-  const fobs=(document.getElementById('filter-reg-obs').value||'').toLowerCase();
-  const list=registros.filter(r=>
-    (!fa||r.aluno===fa) &&
-    (!fs||r.status===fs) &&
-    (!fm||r.data.startsWith(fm)) &&
-    (!fobs||(r.obs||'').toLowerCase().includes(fobs))
-  );
-  if(!list.length){alert('Nenhum registro para exportar com os filtros atuais.');return}
+  const list=registros.filter(r=>(!fa||r.aluno===fa)&&(!fs||r.status===fs)&&(!fm||r.data.startsWith(fm)));
   const rows=[['Data','Início','Fim','Duração(h)','Aluno','Sala','Valor Cobrado','Valor Calc.','Pgto','Status','Obs']];
   list.forEach(r=>{
     const d=calcDur(r.inicio,r.fim);const vc=getValorCalc(r.aluno,d);
@@ -1108,6 +1233,16 @@ updateWeekLabel();
 populateSelects();
 renderCalendar();
 renderAll();
+// GitHub: fill form and auto-load if configured
+ghCfg=loadJ(SK_GH,null);
+ghFillForm();
+if(ghCfg){
+  setSyncStatus('syncing','Carregando do GitHub...');
+  ghFetchFile().then(d=>{
+    if(d){setSyncStatus('ok','Sincronizado');ghUpdateStatusUI(`Carregado em: ${new Date().toLocaleString('pt-BR')}`)}
+    else{setSyncStatus('ok','Conectado');ghUpdateStatusUI('Arquivo data.json ainda não existe no repositório.')}
+  }).catch(e=>{setSyncStatus('err','Erro ao carregar');console.error(e)});
+}
 </script>
 </body>
 </html>
