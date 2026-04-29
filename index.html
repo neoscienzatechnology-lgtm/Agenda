@@ -813,6 +813,29 @@ const badgeClass=s=>s==='VIP 03'?'badge-vip':s==='Sala 03'?'badge-sala':'badge-i
 const calcDur=(i,f)=>{const[h1,m1]=i.split(':').map(Number),[h2,m2]=f.split(':').map(Number);return(h2*60+m2-h1*60-m1)/60};
 const fmtM=v=>(v===''||isNaN(v))?'—':'R$ '+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtDate=d=>d.split('-').reverse().join('/');
+
+// Central matching: event label vs aluno — avoids false matches on first name only
+function evMatchesAluno(ev,a){
+  const label=ev.label.toUpperCase();
+  const nome=a.nome.toUpperCase();
+  // 1. Exact mat match (strongest)
+  if(a.mat&&a.mat.length>2&&label.includes(a.mat.toUpperCase())) return true;
+  // 2. Full name match
+  if(label.includes(nome)) return true;
+  // 3. Last name match (sobrenome) — only if sobrenome has 4+ chars to avoid short false matches
+  const parts=nome.trim().split(' ');
+  const sobrenome=parts[parts.length-1];
+  if(sobrenome.length>=4&&label.includes(sobrenome)) return true;
+  // 4. First+second name (skip if only one word)
+  if(parts.length>=2){
+    const firstName=parts[0], secondName=parts[1];
+    // Only match if BOTH first and last name are present in label
+    if(firstName.length>=3&&sobrenome.length>=4&&label.includes(firstName)&&label.includes(sobrenome)) return true;
+    // Or first + second word together
+    if(firstName.length>=3&&secondName.length>=4&&label.includes(firstName)&&label.includes(secondName)) return true;
+  }
+  return false;
+}
 function getValorCalc(nome,dur){
   const a=alunos.find(x=>x.nome===nome);
   if(a&&a.valor!=='')return parseFloat(a.valor)*dur;
@@ -913,8 +936,9 @@ function createEventEl(ev){
   // Check if there's already a registro for this event today/this week
   const dates=getWeekDates();
   const dateStr=dates[ev.day]?.toISOString().slice(0,10);
-  const inicio=slotToTime(ev.startSlot), fim=slotToTime(ev.endSlot);
-  const regHoje=registros.find(r=>r.data===dateStr&&r.aluno&&ev.label.toLowerCase().includes(r.aluno.toLowerCase().split(' ')[0])&&r.inicio===inicio);
+  const inicio=slotToTime(ev.startSlot);
+  const matchedAluno=alunos.find(a=>evMatchesAluno(ev,a));
+  const regHoje=dateStr&&matchedAluno?registros.find(r=>r.data===dateStr&&r.aluno===matchedAluno.nome&&r.inicio===inicio):null;
   const statusDot=regHoje
     ? `<span class="ev-status-dot ev-dot-${regHoje.status==='Presente'?'ok':regHoje.status==='Falta'?'err':'rep'}" title="${regHoje.status}"></span>`
     : '';
@@ -996,7 +1020,7 @@ function openModalPresenca(evId,e){
   const inicio=slotToTime(ev.startSlot),fim=slotToTime(ev.endSlot);
   // find matching aluno
   let alunoNome=ev.label;
-  const am=alunos.find(a=>ev.label.toUpperCase().includes(a.nome.toUpperCase().split(' ')[0])||ev.label.includes(a.mat));
+  const am=alunos.find(a=>evMatchesAluno(ev,a));
   if(am)alunoNome=am.nome;
   // check existing registro
   const existing=registros.find(r=>r.data===dateStr&&r.inicio===inicio&&
@@ -1161,7 +1185,8 @@ function openModalEv(id,day,slot){
     document.getElementById('ev-label').value=ev.label;
     document.getElementById('ev-course').value=ev.course||'';
     document.getElementById('ev-sala').value=ev.sala;
-    evFillAlunoSelect(ev.label);
+    const _matchA=alunos.find(a=>evMatchesAluno(ev,a));
+    evFillAlunoSelect(_matchA?_matchA.nome:'');
   }else{
     document.getElementById('ev-day').value=day>=0?day:0;
     document.getElementById('ev-start').value=slot>=0?slotToTime(slot):'15:00';
@@ -1487,10 +1512,8 @@ function getBrHolidays(year){
 function buildWeekChecklist(a){
   const regsAluno=registros.filter(r=>r.aluno===a.nome);
 
-  const alunoEvents=events.filter(ev=>
-    ev.label.toUpperCase().includes(a.nome.toUpperCase().split(' ')[0])||
-    (a.mat&&ev.label.includes(a.mat))
-  );
+  // Match events using mat OR full name OR sobrenome (last word) — never just first name alone
+  const alunoEvents=events.filter(ev=>evMatchesAluno(ev,a));
 
   if(!alunoEvents.length&&!regsAluno.length){
     return`<div style="font-size:12px;color:var(--text3);padding:.75rem 0">Nenhuma aula agendada para este aluno. Adicione um evento na agenda com o nome do aluno.</div>`;
