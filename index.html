@@ -219,6 +219,14 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 .btn-link-aluno{padding:7px 14px;background:var(--blue-bg);color:var(--blue-text);border:none;border-radius:var(--radius);font-size:12px;font-weight:650;cursor:pointer;font-family:'Inter',inherit;transition:all .15s}
 .btn-link-aluno:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
 .reposicao-badge{display:inline-block;background:var(--orange-bg);color:var(--orange-text);font-size:10px;font-weight:750;padding:2px 9px;border-radius:99px;margin-left:6px;letter-spacing:.02em}
+.ev-status-dot{position:absolute;top:4px;left:6px;width:7px;height:7px;border-radius:50%;z-index:5;flex-shrink:0}
+.ev-dot-ok{background:#22C55E;box-shadow:0 0 0 2px rgba(34,197,94,.25)}
+.ev-dot-err{background:#EF4444;box-shadow:0 0 0 2px rgba(239,68,68,.25)}
+.ev-dot-rep{background:#F59E0B;box-shadow:0 0 0 2px rgba(245,158,11,.25)}
+.ev-btn-presenca{font-size:12px !important}
+.mp-status-btn.selected-presente{border-color:#22C55E !important;background:#DCFCE7 !important;color:#15803D !important}
+.mp-status-btn.selected-falta{border-color:#EF4444 !important;background:#FEE2E2 !important;color:#991B1B !important}
+.mp-status-btn.selected-reposicao{border-color:#F59E0B !important;background:#FEF3C7 !important;color:#92400E !important}
 @media(max-width:600px){header{padding:.7rem 1rem}.main{padding:1rem .75rem}.stat-value{font-size:18px}.tabs{gap:1px;padding:3px}.tab{padding:6px 10px;font-size:11.5px}}
 </style>
 </head>
@@ -523,6 +531,49 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     </div>
   </div>
 </div><!-- modal-reg -->
+
+<!-- MODAL PRESENÇA RÁPIDA -->
+<div class="modal-overlay" id="modal-presenca" onclick="if(event.target===this)closeModal('modal-presenca')">
+  <div class="modal" style="width:min(440px,100%)">
+    <h3 id="mp-title">Registrar presença</h3>
+    <div style="background:var(--surface2);border-radius:var(--radius-lg);padding:.9rem 1rem;margin-bottom:1.1rem;display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:13px;font-weight:600" id="mp-ev-label"></div>
+      <div style="font-size:12px;color:var(--text2)" id="mp-ev-info"></div>
+    </div>
+
+    <!-- Status buttons -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1.1rem">
+      <button class="mp-status-btn" id="mpb-Presente" onclick="mpSelectStatus('Presente')" style="border-radius:var(--radius);padding:10px 6px;border:2px solid var(--border2);background:var(--surface);cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',inherit;transition:all .15s">
+        ✅ Presente
+      </button>
+      <button class="mp-status-btn" id="mpb-Falta" onclick="mpSelectStatus('Falta')" style="border-radius:var(--radius);padding:10px 6px;border:2px solid var(--border2);background:var(--surface);cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',inherit;transition:all .15s">
+        ❌ Falta
+      </button>
+      <button class="mp-status-btn" id="mpb-Reposição" onclick="mpSelectStatus('Reposição')" style="border-radius:var(--radius);padding:10px 6px;border:2px solid var(--border2);background:var(--surface);cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',inherit;transition:all .15s">
+        🔄 Reposição
+      </button>
+    </div>
+
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:1rem">
+      <div class="form-group"><label>Data</label><input type="date" id="mp-data"></div>
+      <div class="form-group"><label>Valor cobrado (R$)</label><input type="number" id="mp-valor" placeholder="Auto" min="0" step="0.01"></div>
+      <div class="form-group"><label>Forma de pagamento</label>
+        <select id="mp-pgto"><option value="">—</option><option>Pix</option><option>Dinheiro</option><option>Cartão</option><option>Boleto</option></select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:1rem"><label>Observação</label>
+      <input type="text" id="mp-obs" placeholder="Opcional...">
+    </div>
+
+    <!-- Valor estimado preview -->
+    <div id="mp-valor-preview" style="font-size:12px;color:var(--text3);margin-bottom:1rem;min-height:18px"></div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-presenca')">Cancelar</button>
+      <button class="btn-primary" id="mp-save-btn" onclick="savePresenca()">Salvar presença</button>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ── CONSTANTS ── */
@@ -841,11 +892,23 @@ function createEventEl(ev){
   el.className='cal-event '+salaClass(ev.sala);
   el.style.cssText=`top:${top}px;height:${height}px`;
   el.dataset.evid=ev.id;
+
+  // Check if there's already a registro for this event today/this week
+  const dates=getWeekDates();
+  const dateStr=dates[ev.day]?.toISOString().slice(0,10);
+  const inicio=slotToTime(ev.startSlot), fim=slotToTime(ev.endSlot);
+  const regHoje=registros.find(r=>r.data===dateStr&&r.aluno&&ev.label.toLowerCase().includes(r.aluno.toLowerCase().split(' ')[0])&&r.inicio===inicio);
+  const statusDot=regHoje
+    ? `<span class="ev-status-dot ev-dot-${regHoje.status==='Presente'?'ok':regHoje.status==='Falta'?'err':'rep'}" title="${regHoje.status}"></span>`
+    : '';
+
   el.innerHTML=`
+    ${statusDot}
     <span class="ev-name">${ev.label}</span>
     ${ev.course?`<span class="ev-course">${ev.course}</span>`:''}
     <span class="ev-time">${slotToTime(ev.startSlot)}–${slotToTime(ev.endSlot)}</span>
     <span class="ev-actions">
+      <button class="ev-btn ev-btn-presenca" onclick="openModalPresenca(${ev.id},event)" title="Marcar presença">✅</button>
       <button class="ev-btn" onclick="openModalEv(${ev.id},-1,-1);event.stopPropagation()" title="Editar">✏️</button>
       <button class="ev-btn" onclick="duplicateEv(${ev.id});event.stopPropagation()" title="Duplicar">⧉</button>
       <button class="ev-btn" onclick="deleteEv(${ev.id});event.stopPropagation()" title="Excluir">✕</button>
@@ -899,6 +962,115 @@ function finish(cx,cy){
   }
   document.querySelectorAll('.dragging-ev').forEach(el=>el.classList.remove('dragging-ev'));
   dragEv=null;renderCalendar();
+}
+
+/* ── PRESENÇA RÁPIDA ── */
+let mpEvId=null,mpStatus='Presente',mpExistingRegId=null;
+
+function openModalPresenca(evId,e){
+  e.stopPropagation();
+  mpEvId=evId;
+  mpStatus='Presente';
+  mpExistingRegId=null;
+  const ev=events.find(x=>x.id===evId);
+  if(!ev)return;
+  const dates=getWeekDates();
+  const dateStr=dates[ev.day]?.toISOString().slice(0,10)||new Date().toISOString().slice(0,10);
+  const inicio=slotToTime(ev.startSlot),fim=slotToTime(ev.endSlot);
+  // find matching aluno
+  let alunoNome=ev.label;
+  const am=alunos.find(a=>ev.label.toUpperCase().includes(a.nome.toUpperCase().split(' ')[0])||ev.label.includes(a.mat));
+  if(am)alunoNome=am.nome;
+  // check existing registro
+  const existing=registros.find(r=>r.data===dateStr&&r.inicio===inicio&&
+    (r.aluno===alunoNome||ev.label.toLowerCase().includes((r.aluno||'').toLowerCase().split(' ')[0])));
+  document.getElementById('mp-ev-label').textContent=ev.label;
+  document.getElementById('mp-ev-info').textContent=
+    `${['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][ev.day]}, ${dateStr.split('-').reverse().join('/')} · ${inicio}–${fim} · ${ev.sala}`;
+  document.getElementById('mp-data').value=dateStr;
+  document.getElementById('mp-obs').value='';
+  document.getElementById('mp-pgto').value='';
+  if(existing){
+    mpExistingRegId=existing.id;
+    mpStatus=existing.status;
+    document.getElementById('mp-valor').value=existing.valor||'';
+    document.getElementById('mp-obs').value=existing.obs||'';
+    document.getElementById('mp-pgto').value=existing.pgto||'';
+    document.getElementById('mp-title').textContent='Editar presença';
+    document.getElementById('mp-save-btn').textContent='Atualizar';
+  }else{
+    document.getElementById('mp-valor').value='';
+    document.getElementById('mp-title').textContent='Registrar presença';
+    document.getElementById('mp-save-btn').textContent='Salvar presença';
+  }
+  const modal=document.getElementById('modal-presenca');
+  modal.dataset.aluno=alunoNome;
+  modal.dataset.inicio=inicio;
+  modal.dataset.fim=fim;
+  modal.dataset.sala=ev.sala;
+  mpSelectStatus(mpStatus);
+  mpUpdateValorPreview(alunoNome,calcDur(inicio,fim));
+  openModal('modal-presenca');
+}
+
+function mpSelectStatus(s){
+  mpStatus=s;
+  ['Presente','Falta','Reposição'].forEach(st=>{
+    const btn=document.getElementById('mpb-'+st);
+    if(!btn)return;
+    btn.className='mp-status-btn';
+    if(st===s)btn.classList.add('selected-'+st.toLowerCase().replace('ã','a').replace('ç','c'));
+  });
+  const modal=document.getElementById('modal-presenca');
+  if(modal.dataset.aluno&&modal.dataset.inicio&&modal.dataset.fim)
+    mpUpdateValorPreview(modal.dataset.aluno,calcDur(modal.dataset.inicio,modal.dataset.fim));
+}
+
+function mpUpdateValorPreview(alunoNome,durH){
+  const prev=document.getElementById('mp-valor-preview');
+  if(!prev)return;
+  if(mpStatus==='Falta'){prev.textContent='Falta — nenhum valor será calculado.';return}
+  const vc=getValorCalc(alunoNome,durH);
+  if(vc!==''){
+    prev.innerHTML=`Valor estimado: <strong>${fmtM(vc)}</strong> (${durH.toFixed(1)}h × R$${(vc/durH).toFixed(2)}/h)`;
+  }else{
+    prev.textContent='Configure valor/hora em Alunos ou Horas & Valores para calcular automaticamente.';
+  }
+}
+
+function savePresenca(){
+  const data=document.getElementById('mp-data').value;
+  const modal=document.getElementById('modal-presenca');
+  const aluno=modal.dataset.aluno;
+  const inicio=modal.dataset.inicio;
+  const fim=modal.dataset.fim;
+  const sala=modal.dataset.sala;
+  const valor=document.getElementById('mp-valor').value;
+  const pgto=document.getElementById('mp-pgto').value;
+  const obs=document.getElementById('mp-obs').value;
+  if(!data||!aluno){alert('Dados insuficientes.');return}
+  if(mpExistingRegId){
+    const r=registros.find(x=>x.id===mpExistingRegId);
+    if(r){r.status=mpStatus;r.valor=valor;r.pgto=pgto;r.obs=obs;r.data=data;}
+  }else{
+    registros.push({id:nextRid++,data,inicio,fim,aluno,sala,valor,pgto,status:mpStatus,obs});
+  }
+  saveJ(SK_R,registros);
+  renderCalendar();renderAll();
+  closeModal('modal-presenca');
+  const msgs={Presente:`✅ Presença registrada — ${aluno}`,Falta:`❌ Falta registrada — ${aluno}`,Reposição:`🔄 Reposição registrada — ${aluno}`};
+  showToast(msgs[mpStatus]||'Registro salvo');
+}
+
+function showToast(msg){
+  let t=document.getElementById('_toast');
+  if(!t){
+    t=document.createElement('div');t.id='_toast';
+    t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(0);background:var(--text);color:var(--surface);padding:10px 22px;border-radius:99px;font-size:13px;font-weight:650;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.28);transition:opacity .35s;pointer-events:none;font-family:Inter,sans-serif;letter-spacing:-.1px';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2800);
 }
 
 /* ── EVENT CRUD ── */
