@@ -242,6 +242,21 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 .wk-slot{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border-radius:var(--radius);padding:6px 8px;border:1px solid var(--border);min-width:72px}
 .wk-slot-day{font-size:10px;font-weight:600;color:var(--text2);text-align:center;line-height:1.3}
 
+.ai-msg{display:flex;gap:8px;align-items:flex-start}
+.ai-msg-user{flex-direction:row-reverse}
+.ai-bubble{max-width:85%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.ai-msg-ai .ai-bubble{background:var(--surface);border:1px solid var(--border);border-radius:4px 14px 14px 14px;color:var(--text)}
+.ai-msg-user .ai-bubble{background:linear-gradient(135deg,#7C3AED,#4F46E5);color:#fff;border-radius:14px 4px 14px 14px}
+.ai-bubble strong{font-weight:700}
+.ai-bubble ul{padding-left:1.2rem;margin:.3rem 0}
+.ai-bubble li{margin-bottom:.2rem}
+.ai-chip{padding:6px 12px;border-radius:99px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:11.5px;font-weight:500;cursor:pointer;font-family:'Inter',inherit;transition:all .15s;white-space:nowrap}
+.ai-chip:hover{background:var(--purple-bg);color:var(--purple-text);border-color:var(--purple-text)}
+.ai-typing{display:flex;gap:4px;align-items:center;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:4px 14px 14px 14px;width:fit-content}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:var(--text3);animation:aiDot 1.2s infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aiDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
 @media(max-width:600px){header{padding:.7rem 1rem}.main{padding:1rem .75rem}.stat-value{font-size:18px}.tabs{gap:1px;padding:3px}.tab{padding:6px 10px;font-size:11.5px}}
 </style>
 </head>
@@ -272,6 +287,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     <button class="tab" onclick="showTab('registros',this)">Registros</button>
     <button class="tab" onclick="showTab('relatorio',this)">Relatório</button>
     <button class="tab" onclick="showTab('fechamento',this)">💰 Fechamento</button>
+    <button class="tab" onclick="showTab('ia',this)">🤖 Assistente IA</button>
     <button class="tab" onclick="showTab('config',this)" id="tab-config" style="margin-left:auto">⚙️ Firebase</button>
   </div>
 
@@ -405,6 +421,48 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
     </div>
     <div class="stats-grid" id="fech-stats"></div>
     <div id="fech-cards"></div>
+  </div>
+
+  <!-- ASSISTENTE IA -->
+  <div id="section-ia" class="section">
+    <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;height:calc(100vh - 180px);min-height:400px">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7C3AED,#4F46E5);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🤖</div>
+        <div>
+          <div style="font-size:15px;font-weight:700;letter-spacing:-.2px">Assistente IA</div>
+          <div style="font-size:11px;color:var(--text3)">Powered by Claude · Pergunte sobre seus alunos, horas, pagamentos e agenda</div>
+        </div>
+        <button onclick="aiClear()" class="btn-secondary" style="margin-left:auto;font-size:11px;padding:5px 11px">Limpar chat</button>
+      </div>
+
+      <!-- Suggested prompts -->
+      <div id="ai-suggestions" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.85rem">
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Quais alunos têm faltas esta semana?</button>
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Quanto vou receber este mês?</button>
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Quem está perto de terminar o curso?</button>
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Resumo geral da agenda</button>
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Quem faltou mais vezes?</button>
+        <button class="ai-chip" onclick="aiAsk(this.textContent)">Quais pagamentos estão em aberto?</button>
+      </div>
+
+      <!-- Chat messages -->
+      <div id="ai-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px;margin-bottom:.85rem;scroll-behavior:smooth">
+        <div class="ai-msg ai-msg-ai">
+          <div class="ai-bubble">Olá! Sou seu assistente de agenda. Tenho acesso a todos os seus dados — alunos, registros de presença, fechamentos e agenda. Como posso ajudar?</div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="ai-input" placeholder="Ex: Quantas horas dei para o Ryan Padilha este mês?" rows="2"
+          style="flex:1;resize:none;font-size:13px;padding:10px 12px;border-radius:var(--radius-lg);border:1.5px solid var(--border2);background:var(--surface);color:var(--text);font-family:'Inter',inherit;outline:none;line-height:1.5;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--border2)'"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}"></textarea>
+        <button onclick="aiSend()" id="ai-send-btn" style="width:44px;height:44px;border-radius:var(--radius-lg);background:linear-gradient(135deg,#7C3AED,#4F46E5);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:opacity .15s;box-shadow:0 2px 8px rgba(124,58,237,.3)" title="Enviar">➤</button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:6px">Enter para enviar · Shift+Enter para nova linha</div>
+    </div>
   </div>
 
   <!-- CONFIG / STATUS FIREBASE -->
@@ -2065,6 +2123,7 @@ function showTab(name,btn){
   if(name==='relatorio')renderRelatorio();
   if(name==='horas')renderHoras();
   if(name==='fechamento'){updateMonthFilter();renderFechamento();}
+  if(name==='ia'){document.getElementById('ai-input').focus();}
 }
 
 /* ── EXPORT ── */
@@ -2083,7 +2142,148 @@ function exportCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='controle_horas.csv';a.click();
 }
 
-/* ── INIT ── */
+/* ── ASSISTENTE IA ── */
+let aiHistory=[];
+
+function aiGetContext(){
+  // Build a rich summary of current data for the AI
+  const hoje=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const tH=registros.filter(r=>r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
+  const tPres=registros.filter(r=>r.status==='Presente').length;
+  const tFalta=registros.filter(r=>r.status==='Falta').length;
+  const mesAtual=new Date().toISOString().slice(0,7);
+
+  const alunosInfo=alunos.map(a=>{
+    const regs=registros.filter(r=>r.aluno===a.nome);
+    const feitas=regs.filter(r=>r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
+    const faltas=regs.filter(r=>r.status==='Falta').length;
+    const pres=regs.filter(r=>r.status==='Presente').length;
+    const taxa=regs.length?Math.round(pres/regs.length*100):null;
+    const vCalc=regs.filter(r=>r.status!=='Falta').reduce((s,r)=>{
+      const d=calcDur(r.inicio,r.fim);const v=r.valor!==''?parseFloat(r.valor):getValorCalc(r.nome||a.nome,d);return s+(v===''?0:v);
+    },0);
+    const pgKey=`pgto_${mesAtual}`;
+    const pgData=loadJ(pgKey,{});
+    const pago=parseFloat(pgData[a.nome])||0;
+    const regsM=registros.filter(r=>r.aluno===a.nome&&r.data.startsWith(mesAtual));
+    const vMes=regsM.filter(r=>r.status!=='Falta').reduce((s,r)=>{
+      const d=calcDur(r.inicio,r.fim);const v=r.valor!==''?parseFloat(r.valor):getValorCalc(a.nome,d);return s+(v===''?0:v);
+    },0);
+    const dias=(a.dias&&a.dias.length)?a.dias.map(d=>['Seg','Ter','Qua','Qui','Sex','Sáb'][d.day]+' '+d.inicio+'–'+d.fim).join(', '):'não cadastrado';
+    let previsao='';
+    if(a.ch>0&&a.horas>0&&a.inicio){
+      const sem=Math.ceil(Math.max(0,a.ch-feitas)/a.horas);
+      const df=new Date(a.inicio+'T12:00:00');df.setDate(df.getDate()+Math.ceil(a.ch/a.horas)*7);
+      previsao=` | Previsão fim: ${df.toLocaleDateString('pt-BR')} | Restam: ${Math.max(0,a.ch-feitas).toFixed(1)}h (~${sem} sem)`;
+    }
+    return `- ${a.nome} (mat: ${a.mat||'—'}) | Curso: ${a.curso||'—'} | Sala: ${a.sala} | CH: ${a.ch||'?'}h | Feitas: ${feitas.toFixed(1)}h | Presença: ${taxa!==null?taxa+'%':'—'} | Faltas: ${faltas} | Valor/h: ${a.valor!==''?'R$'+parseFloat(a.valor).toFixed(2):'padrão'} | Dias: ${dias}${previsao} | Faturamento total: R$${vCalc.toFixed(2)} | Mês atual: R$${vMes.toFixed(2)} | Pago mês: R$${pago.toFixed(2)} | Saldo: R$${(vMes-pago).toFixed(2)}`;
+  }).join('\n');
+
+  const ultimosRegs=registros.slice(-20).map(r=>
+    `${r.data} ${r.inicio}–${r.fim} ${r.aluno} [${r.status}]${r.valor?` R$${r.valor}`:''}`
+  ).join('\n');
+
+  return `Você é um assistente de gestão de aulas do professor William. Hoje é ${hoje}.
+
+DADOS DOS ALUNOS (${alunos.length} cadastrados):
+${alunosInfo||'Nenhum'}
+
+ESTATÍSTICAS GERAIS:
+- Total de registros: ${registros.length}
+- Horas dadas: ${tH.toFixed(1)}h
+- Presenças: ${tPres} | Faltas: ${tFalta} | Taxa global: ${registros.length?Math.round(tPres/registros.length*100):0}%
+- Valor padrão por hora: ${config.valorHora?'R$'+parseFloat(config.valorHora).toFixed(2):'não configurado'}
+
+ÚLTIMOS 20 REGISTROS:
+${ultimosRegs||'Nenhum'}
+
+Responda sempre em português, de forma direta e útil. Use formatação clara (negrito para nomes, listas quando necessário). Se perguntado sobre cálculos, mostre o passo a passo. Foque nos dados reais fornecidos acima.`;
+}
+
+function aiGetMessages(){
+  const box=document.getElementById('ai-messages');return box;
+}
+
+function aiAppend(role,text,isTyping=false){
+  const box=aiGetMessages();
+  const wrap=document.createElement('div');
+  wrap.className=`ai-msg ai-msg-${role}`;
+  if(isTyping){
+    wrap.id='ai-typing-indicator';
+    wrap.innerHTML=`<div class="ai-typing"><span></span><span></span><span></span></div>`;
+  }else{
+    // simple markdown: **bold**, bullet lists
+    const html=text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^[-•]\s+(.+)$/gm,'<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/s,'<ul>$1</ul>')
+      .replace(/\n/g,'<br>');
+    wrap.innerHTML=`<div class="ai-bubble">${html}</div>`;
+  }
+  box.appendChild(wrap);
+  box.scrollTop=box.scrollHeight;
+  return wrap;
+}
+
+async function aiSend(){
+  const inp=document.getElementById('ai-input');
+  const txt=inp.value.trim();
+  if(!txt)return;
+  inp.value='';inp.style.height='auto';
+  document.getElementById('ai-send-btn').disabled=true;
+  document.getElementById('ai-suggestions').style.display='none';
+
+  aiAppend('user',txt);
+  aiHistory.push({role:'user',content:txt});
+
+  const typing=aiAppend('ai','',true);
+
+  try{
+    const systemPrompt=aiGetContext();
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:systemPrompt,
+        messages:aiHistory
+      })
+    });
+    const data=await res.json();
+    typing.remove();
+    if(data.content&&data.content[0]){
+      const reply=data.content[0].text;
+      aiHistory.push({role:'assistant',content:reply});
+      // keep history short
+      if(aiHistory.length>20) aiHistory=aiHistory.slice(-18);
+      aiAppend('ai',reply);
+    }else{
+      aiAppend('ai','Desculpe, não consegui obter resposta. Tente novamente.');
+    }
+  }catch(err){
+    typing.remove();
+    aiAppend('ai','Erro de conexão com a IA. Verifique sua internet e tente novamente.');
+    console.error('AI error:',err);
+  }
+  document.getElementById('ai-send-btn').disabled=false;
+  aiGetMessages().scrollTop=9999;
+}
+
+function aiAsk(txt){
+  document.getElementById('ai-input').value=txt;
+  aiSend();
+}
+
+function aiClear(){
+  aiHistory=[];
+  const box=aiGetMessages();
+  box.innerHTML='<div class="ai-msg ai-msg-ai"><div class="ai-bubble">Chat limpo! Como posso ajudar?</div></div>';
+  document.getElementById('ai-suggestions').style.display='flex';
+}
+
+
 document.getElementById('reg-data').value=new Date().toISOString().split('T')[0];
 document.getElementById('reg-inicio').value='15:00';
 document.getElementById('reg-fim').value='16:30';
