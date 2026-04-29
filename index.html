@@ -419,8 +419,40 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 
 <!-- MODAL EVENTO AGENDA -->
 <div class="modal-overlay" id="modal-ev" onclick="if(event.target===this)closeModal('modal-ev')">
-  <div class="modal">
+  <div class="modal" style="width:min(560px,100%)">
     <h3 id="modal-ev-title">Novo evento</h3>
+
+    <!-- Aluno selector -->
+    <div class="form-group" style="margin-bottom:1rem">
+      <label>Aluno cadastrado</label>
+      <div style="display:flex;gap:8px">
+        <select id="ev-aluno-sel" onchange="evAlunoSelected()" style="flex:1;font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--surface);color:var(--text);font-family:'Inter',inherit;outline:none">
+          <option value="">— Selecionar aluno cadastrado —</option>
+        </select>
+        <button type="button" class="btn-secondary" onclick="evToggleNewAluno()" id="btn-new-aluno" title="Cadastrar novo aluno agora" style="white-space:nowrap;padding:8px 12px;font-size:12px">+ Novo</button>
+      </div>
+    </div>
+
+    <!-- Quick new aluno panel (hidden by default) -->
+    <div id="ev-new-aluno-panel" style="display:none;background:var(--surface2);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem;border:1px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Cadastrar novo aluno</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="form-group"><label>Matrícula</label><input type="text" id="qk-mat" placeholder="Ex: 8711"></div>
+        <div class="form-group"><label>Nome completo</label><input type="text" id="qk-nome" placeholder="Nome do aluno"></div>
+        <div class="form-group"><label>Curso / Descrição</label><input type="text" id="qk-curso" placeholder="Ex: AutoCAD 25h"></div>
+        <div class="form-group"><label>Sala</label>
+          <select id="qk-sala"><option>VIP 03</option><option>Sala 03</option><option>In Company</option></select>
+        </div>
+        <div class="form-group"><label>Valor/hora (R$)</label><input type="number" id="qk-valor" placeholder="Ex: 50,00" min="0" step="0.01"></div>
+        <div class="form-group"><label>WhatsApp</label><input type="text" id="qk-whats" placeholder="Ex: 11999998888"></div>
+      </div>
+      <button type="button" class="btn-primary" onclick="evSaveQuickAluno()" style="font-size:12px;padding:7px 16px">✓ Cadastrar e selecionar</button>
+    </div>
+
+    <!-- Divider -->
+    <div style="height:.5px;background:var(--border);margin-bottom:1rem"></div>
+
+    <!-- Event details -->
     <div class="form-grid">
       <div class="form-group"><label>Dia da semana</label>
         <select id="ev-day"><option value="0">Segunda</option><option value="1">Terça</option><option value="2">Quarta</option><option value="3">Quinta</option><option value="4">Sexta</option><option value="5">Sábado</option></select>
@@ -870,9 +902,68 @@ function finish(cx,cy){
 }
 
 /* ── EVENT CRUD ── */
+function evFillAlunoSelect(selectedNome=''){
+  const sel=document.getElementById('ev-aluno-sel');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Selecionar aluno cadastrado —</option>'+
+    alunos.map(a=>{
+      const label=(a.mat?a.mat+' – ':'')+a.nome+(a.curso?' ('+a.curso+')':'');
+      // match by nome or by label prefix
+      const isSelected=selectedNome&&(a.nome===selectedNome||selectedNome.toLowerCase().includes(a.nome.toLowerCase())||a.nome.toLowerCase().includes(selectedNome.toLowerCase()));
+      return`<option value="${a.id}"${isSelected?' selected':''}>${label}</option>`;
+    }).join('');
+}
+
+function evAlunoSelected(){
+  const sel=document.getElementById('ev-aluno-sel');
+  const id=parseInt(sel.value);
+  if(!id)return;
+  const a=alunos.find(x=>x.id===id);
+  if(!a)return;
+  document.getElementById('ev-label').value=(a.mat?a.mat+' - ':'')+a.nome.toUpperCase();
+  document.getElementById('ev-course').value=a.curso||'';
+  document.getElementById('ev-sala').value=a.sala||'VIP 03';
+  document.getElementById('ev-new-aluno-panel').style.display='none';
+  document.getElementById('btn-new-aluno').textContent='+ Novo';
+}
+
+function evToggleNewAluno(){
+  const panel=document.getElementById('ev-new-aluno-panel');
+  const btn=document.getElementById('btn-new-aluno');
+  const open=panel.style.display==='none';
+  panel.style.display=open?'block':'none';
+  btn.textContent=open?'✕ Fechar':'+ Novo';
+  if(open)setTimeout(()=>document.getElementById('qk-nome').focus(),80);
+}
+
+function evSaveQuickAluno(){
+  const nome=document.getElementById('qk-nome').value.trim();
+  if(!nome){alert('Informe o nome do aluno.');return}
+  const mat=document.getElementById('qk-mat').value.trim();
+  const curso=document.getElementById('qk-curso').value.trim();
+  const sala=document.getElementById('qk-sala').value;
+  const valor=document.getElementById('qk-valor').value;
+  const whats=document.getElementById('qk-whats').value.trim().replace(/\D/g,'');
+  const novo={id:nextAid++,mat,nome,curso,ch:0,sala,horas:0,valor,venc:'',whats};
+  alunos.push(novo);
+  saveJ(SK_A,alunos);
+  populateSelects();
+  renderAlunos();
+  evFillAlunoSelect(nome);
+  document.getElementById('ev-label').value=(mat?mat+' - ':'')+nome.toUpperCase();
+  document.getElementById('ev-course').value=curso;
+  document.getElementById('ev-sala').value=sala;
+  ['qk-mat','qk-nome','qk-curso','qk-valor','qk-whats'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('qk-sala').value='VIP 03';
+  document.getElementById('ev-new-aluno-panel').style.display='none';
+  document.getElementById('btn-new-aluno').textContent='+ Novo';
+}
+
 function openModalEv(id,day,slot){
   editEvId=id;
   document.getElementById('modal-ev-title').textContent=id?'Editar evento':'Novo evento';
+  document.getElementById('ev-new-aluno-panel').style.display='none';
+  document.getElementById('btn-new-aluno').textContent='+ Novo';
   if(id){
     const ev=events.find(x=>x.id===id);
     document.getElementById('ev-day').value=ev.day;
@@ -881,6 +972,7 @@ function openModalEv(id,day,slot){
     document.getElementById('ev-label').value=ev.label;
     document.getElementById('ev-course').value=ev.course||'';
     document.getElementById('ev-sala').value=ev.sala;
+    evFillAlunoSelect(ev.label);
   }else{
     document.getElementById('ev-day').value=day>=0?day:0;
     document.getElementById('ev-start').value=slot>=0?slotToTime(slot):'15:00';
@@ -888,13 +980,14 @@ function openModalEv(id,day,slot){
     document.getElementById('ev-label').value='';
     document.getElementById('ev-course').value='';
     document.getElementById('ev-sala').value='VIP 03';
+    evFillAlunoSelect();
   }
   openModal('modal-ev');
-  setTimeout(()=>document.getElementById('ev-label').focus(),80);
 }
+
 function saveEvento(){
   const label=document.getElementById('ev-label').value.trim();
-  if(!label){alert('Informe o nome/matrícula.');return}
+  if(!label){alert('Informe o nome/matrícula ou selecione um aluno.');return}
   const start=timeToSlot(document.getElementById('ev-start').value);
   const end=timeToSlot(document.getElementById('ev-end').value);
   if(end<=start){alert('Fim deve ser após o início.');return}
