@@ -227,6 +227,21 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 .mp-status-btn.selected-presente{border-color:#22C55E !important;background:#DCFCE7 !important;color:#15803D !important}
 .mp-status-btn.selected-falta{border-color:#EF4444 !important;background:#FEE2E2 !important;color:#991B1B !important}
 .mp-status-btn.selected-reposicao{border-color:#F59E0B !important;background:#FEF3C7 !important;color:#92400E !important}
+
+/* ALUNO CARDS */
+.aluno-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-xl);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
+.aluno-card:hover{box-shadow:var(--shadow-md)}
+.aluno-card-header{display:flex;align-items:flex-start;gap:12px;padding:1rem 1.25rem;cursor:pointer;transition:background .15s}
+.aluno-card-header:hover{background:var(--surface2)}
+.aluno-card-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2277D9,#1050A0);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:750;flex-shrink:0;letter-spacing:-.5px}
+.aluno-weeks-panel{padding:.75rem 1.25rem 1rem;border-top:1px solid var(--border);background:var(--surface2)}
+.wk-row{display:flex;align-items:flex-start;gap:12px;padding:.6rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.wk-row:last-child{border-bottom:none}
+.wk-label{font-size:11px;font-weight:700;color:var(--text2);min-width:110px;padding-top:5px;flex-shrink:0}
+.wk-slots{display:flex;gap:8px;flex-wrap:wrap;flex:1}
+.wk-slot{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--surface);border-radius:var(--radius);padding:6px 8px;border:1px solid var(--border);min-width:72px}
+.wk-slot-day{font-size:10px;font-weight:600;color:var(--text2);text-align:center;line-height:1.3}
+
 @media(max-width:600px){header{padding:.7rem 1rem}.main{padding:1rem .75rem}.stat-value{font-size:18px}.tabs{gap:1px;padding:3px}.tab{padding:6px 10px;font-size:11.5px}}
 </style>
 </head>
@@ -298,12 +313,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
         <option value="">Todas</option><option>VIP 03</option><option>Sala 03</option><option>In Company</option>
       </select>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th style="width:24px"></th><th>Mat.</th><th>Aluno</th><th>Curso</th><th>C.H. Total</th><th>Sala</th><th>Valor/h</th><th>H/sem</th><th></th></tr></thead>
-        <tbody id="alunos-tbody"></tbody>
-      </table>
-    </div>
+    <div id="alunos-cards"></div>
   </div>
 
   <!-- HORAS -->
@@ -493,9 +503,16 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
         <select id="m-sala"><option>VIP 03</option><option>Sala 03</option><option>In Company</option></select>
       </div>
       <div class="form-group"><label>Valor por hora (R$)</label><input type="number" id="m-valor" placeholder="Ex: 50,00" min="0" step="0.01"></div>
-      <div class="form-group"><label>Horas/semana</label><input type="number" id="m-horas" placeholder="Ex: 2" min="0" step="0.5"></div>
+      <div class="form-group"><label>Horas/semana</label><input type="number" id="m-horas" placeholder="Ex: 2" min="0" step="0.5" oninput="calcEndDate()"></div>
       <div class="form-group"><label>Vencimento (dia do mês)</label><input type="number" id="m-venc" placeholder="Ex: 5" min="1" max="31"></div>
       <div class="form-group"><label>WhatsApp (só números)</label><input type="text" id="m-whats" placeholder="Ex: 11999998888"></div>
+      <div class="form-group"><label>Data de início</label><input type="date" id="m-inicio" oninput="calcEndDate()"></div>
+    </div>
+    <!-- Calculator box -->
+    <div id="m-calc-box" style="display:none;background:var(--blue-bg);border-radius:var(--radius-lg);padding:.85rem 1rem;margin-bottom:1rem;border:1px solid rgba(26,104,194,.15)">
+      <div style="font-size:11px;font-weight:700;color:var(--blue-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">📅 Previsão de conclusão</div>
+      <div id="m-calc-result" style="font-size:13px;color:var(--blue-text)"></div>
+    </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('modal-aluno')">Cancelar</button>
@@ -1236,8 +1253,10 @@ function openModalAluno(id){
     document.getElementById('m-horas').value=a.horas;
     document.getElementById('m-venc').value=a.venc||'';
     document.getElementById('m-whats').value=a.whats||'';
+    document.getElementById('m-inicio').value=a.inicio||'';
+    calcEndDate();
   }else{
-    ['m-mat','m-nome','m-curso','m-ch','m-valor','m-horas','m-venc','m-whats'].forEach(f=>document.getElementById(f).value='');
+    ['m-mat','m-nome','m-curso','m-ch','m-valor','m-horas','m-venc','m-whats','m-inicio'].forEach(f=>document.getElementById(f).value='');
     document.getElementById('m-sala').value='VIP 03';
   }
   openModal('modal-aluno');setTimeout(()=>document.getElementById('m-nome').focus(),80);
@@ -1245,7 +1264,7 @@ function openModalAluno(id){
 function saveAluno(){
   const nome=document.getElementById('m-nome').value.trim();
   if(!nome){alert('Informe o nome.');return}
-  const obj={mat:document.getElementById('m-mat').value.trim(),nome,curso:document.getElementById('m-curso').value.trim(),ch:parseFloat(document.getElementById('m-ch').value)||0,sala:document.getElementById('m-sala').value,valor:document.getElementById('m-valor').value,horas:parseFloat(document.getElementById('m-horas').value)||0,venc:document.getElementById('m-venc').value,whats:document.getElementById('m-whats').value.trim().replace(/\D/g,'')};
+  const obj={mat:document.getElementById('m-mat').value.trim(),nome,curso:document.getElementById('m-curso').value.trim(),ch:parseFloat(document.getElementById('m-ch').value)||0,sala:document.getElementById('m-sala').value,valor:document.getElementById('m-valor').value,horas:parseFloat(document.getElementById('m-horas').value)||0,venc:document.getElementById('m-venc').value,whats:document.getElementById('m-whats').value.trim().replace(/\D/g,''),inicio:document.getElementById('m-inicio').value};
   if(editAid)Object.assign(alunos.find(a=>a.id===editAid),obj);
   else alunos.push({id:nextAid++,...obj});
   saveJ(SK_A,alunos);populateSelects();renderAll();closeModal('modal-aluno');
@@ -1333,28 +1352,208 @@ function renderStats(){
     <div class="stat-card"><div class="stat-label">Faturamento total</div><div class="stat-value" style="font-size:16px">${tVal?fmtM(tVal):'—'}</div></div>`;
 }
 
+function calcEndDate(){
+  const ch=parseFloat(document.getElementById('m-ch').value)||0;
+  const horas=parseFloat(document.getElementById('m-horas').value)||0;
+  const inicio=document.getElementById('m-inicio').value;
+  const box=document.getElementById('m-calc-box');
+  const res=document.getElementById('m-calc-result');
+  if(!box||!res)return;
+  if(!ch||!horas||!inicio){box.style.display='none';return}
+  const semanas=Math.ceil(ch/horas);
+  const d=new Date(inicio+'T12:00:00');
+  d.setDate(d.getDate()+semanas*7);
+  const fim=d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const inicioFmt=new Date(inicio+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  res.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:4px">
+      <div><div style="font-size:10px;opacity:.7;margin-bottom:2px">INÍCIO</div><strong>${inicioFmt}</strong></div>
+      <div><div style="font-size:10px;opacity:.7;margin-bottom:2px">SEMANAS</div><strong>${semanas} semanas</strong></div>
+      <div><div style="font-size:10px;opacity:.7;margin-bottom:2px">PREVISÃO FIM</div><strong>${fim}</strong></div>
+    </div>`;
+  box.style.display='block';
+}
+
+// track expanded aluno ids
+const expandedAlunos=new Set();
+
 function renderAlunos(){
   const q=(document.getElementById('search-aluno').value||'').toLowerCase();
   const sala=document.getElementById('filter-sala').value;
   const list=alunos.filter(a=>(!q||a.nome.toLowerCase().includes(q)||a.mat.toLowerCase().includes(q))&&(!sala||a.sala===sala));
-  document.getElementById('alunos-tbody').innerHTML=list.length?list.map(a=>{
+  const container=document.getElementById('alunos-cards');
+  if(!list.length){container.innerHTML=`<div class="empty-state">Nenhum aluno encontrado.</div>`;return}
+
+  container.innerHTML=list.map(a=>{
     const feitas=registros.filter(r=>r.aluno===a.nome&&r.status!=='Falta').reduce((s,r)=>s+calcDur(r.inicio,r.fim),0);
-    const chTxt=a.ch>0?`${feitas.toFixed(1)}/${a.ch}h`:`${feitas.toFixed(1)}h`;
-    return`<tr draggable="true" data-id="${a.id}" ondragstart="onDragStart(event,${a.id},'aluno')" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondragend="onDragEnd(event)" ondrop="onDrop(event,${a.id},'aluno')">
-      <td><span class="drag-handle">⠿</span></td>
-      <td class="mat">${a.mat}</td><td class="nome-forte">${a.nome}</td>
-      <td style="color:var(--text2);font-size:12px">${a.curso}</td>
-      <td style="font-size:12px">${chTxt}</td>
-      <td><span class="badge ${badgeClass(a.sala)}">${a.sala}</span></td>
-      <td>${a.valor!==''?`<span class="valor-chip">R$${parseFloat(a.valor).toFixed(2)}/h</span>`:`<span class="hint-text">padrão</span>`}</td>
-      <td>${a.horas}h</td>
-      <td style="display:flex;gap:3px">
-        <button class="btn-icon edit-btn" onclick="openModalAluno(${a.id})">✏️</button>
-        <button class="btn-icon del-btn" onclick="deleteAluno(${a.id})">✕</button>
-      </td>
-    </tr>`;
-  }).join(''):`<tr><td colspan="9" class="empty-state">Nenhum aluno.</td></tr>`;
+    const faltas=registros.filter(r=>r.aluno===a.nome&&r.status==='Falta').length;
+    const pct=a.ch>0?Math.min(100,Math.round(feitas/a.ch*100)):null;
+    const chTxt=a.ch>0?`${feitas.toFixed(1)}/${a.ch}h (${pct}%)`:feitas.toFixed(1)+'h';
+    const isExp=expandedAlunos.has(a.id);
+
+    // Previsão de conclusão
+    let previsaoHtml='';
+    if(a.ch>0&&a.horas>0&&a.inicio){
+      const semanas=Math.ceil(a.ch/a.horas);
+      const d=new Date(a.inicio+'T12:00:00');d.setDate(d.getDate()+semanas*7);
+      const horasRestantes=Math.max(0,a.ch-feitas);
+      const semanasRest=a.horas>0?Math.ceil(horasRestantes/a.horas):0;
+      const dRest=new Date();dRest.setDate(dRest.getDate()+semanasRest*7);
+      previsaoHtml=`
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:6px">
+          <span>📅 Início: <strong>${new Date(a.inicio+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></span>
+          <span>🎯 Prev. fim: <strong>${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})}</strong></span>
+          ${horasRestantes>0?`<span>⏳ Restam: <strong>${horasRestantes.toFixed(1)}h (~${semanasRest} sem.)</strong></span>`:'<span style="color:var(--green-text);font-weight:700">✅ Curso concluído!</span>'}
+        </div>`;
+    }else if(a.ch>0&&a.horas>0&&!a.inicio){
+      const semanas=Math.ceil(a.ch/a.horas);
+      previsaoHtml=`<div style="font-size:11px;color:var(--text3);margin-top:4px">📅 Informe a data de início para calcular previsão de conclusão (${semanas} semanas no total)</div>`;
+    }
+
+    // Checklist weeks HTML (hidden until expanded)
+    const weeksHtml=isExp?buildWeekChecklist(a):'';
+
+    return`<div class="aluno-card" id="acard-${a.id}">
+      <div class="aluno-card-header" onclick="toggleAlunoExpand(${a.id})">
+        <div class="aluno-card-avatar">${a.nome[0].toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="nome-forte">${a.nome}</span>
+            <span class="mat">${a.mat}</span>
+            <span class="badge ${badgeClass(a.sala)}">${a.sala}</span>
+            ${faltas>0?`<span style="font-size:10px;font-weight:700;color:var(--red-text);background:var(--red-bg);padding:2px 7px;border-radius:99px">${faltas} falta${faltas>1?'s':''}</span>`:''}
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">${a.curso||'—'}</div>
+          ${a.ch>0?`<div style="margin-top:6px">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px"><span>${chTxt}</span><span>${pct}%</span></div>
+            <div style="height:5px;background:var(--surface2);border-radius:99px;overflow:hidden"><div style="height:100%;border-radius:99px;background:linear-gradient(90deg,#2277D9,#1050A0);width:${pct}%"></div></div>
+          </div>`:''}
+          ${previsaoHtml}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;align-items:flex-start">
+          <button class="btn-icon edit-btn" onclick="event.stopPropagation();openModalAluno(${a.id})" title="Editar">✏️</button>
+          <button class="btn-icon del-btn" onclick="event.stopPropagation();deleteAluno(${a.id})" title="Remover">✕</button>
+          <span style="font-size:16px;color:var(--text3);padding:3px 4px;cursor:pointer;transform:rotate(${isExp?180:0}deg);transition:transform .2s">${isExp?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${isExp?`<div class="aluno-weeks-panel">${weeksHtml}</div>`:''}
+    </div>`;
+  }).join('');
 }
+
+function toggleAlunoExpand(id){
+  if(expandedAlunos.has(id))expandedAlunos.delete(id);
+  else expandedAlunos.add(id);
+  renderAlunos();
+}
+
+function buildWeekChecklist(a){
+  // Get all weeks that have events matching this aluno OR any registro
+  const regsAluno=registros.filter(r=>r.aluno===a.nome).sort((x,y)=>x.data.localeCompare(y.data));
+
+  // Build set of week start dates from registros + last 8 weeks
+  const weekStarts=new Set();
+  const today=new Date();today.setHours(0,0,0,0);
+
+  // Last 8 weeks
+  for(let w=0;w<8;w++){
+    const d=new Date(today);
+    const dow=d.getDay()||7;
+    d.setDate(d.getDate()-dow+1-w*7);
+    weekStarts.add(d.toISOString().slice(0,10));
+  }
+  // Weeks from existing registros
+  regsAluno.forEach(r=>{
+    const d=new Date(r.data+'T12:00:00');
+    const dow=d.getDay()||7;
+    d.setDate(d.getDate()-dow+1);
+    weekStarts.add(d.toISOString().slice(0,10));
+  });
+
+  const weeks=[...weekStarts].sort().reverse();
+
+  // Find events that match this aluno in the agenda
+  const alunoEvents=events.filter(ev=>
+    ev.label.toUpperCase().includes(a.nome.toUpperCase().split(' ')[0])||
+    (a.mat&&ev.label.includes(a.mat))
+  );
+
+  if(!alunoEvents.length&&!regsAluno.length){
+    return`<div style="font-size:12px;color:var(--text3);padding:.75rem 0">Nenhuma aula agendada para este aluno. Adicione um evento na agenda com o nome do aluno.</div>`;
+  }
+
+  const DAYS_PT=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  const rows=weeks.map(wStart=>{
+    const ws=new Date(wStart+'T12:00:00');
+    const we=new Date(ws);we.setDate(ws.getDate()+5);
+    const wLabel=ws.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' – '+we.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+
+    // For each event of this aluno, check the date in this week
+    const slots=alunoEvents.map(ev=>{
+      const evDate=new Date(ws);evDate.setDate(ws.getDate()+ev.day);
+      const dateStr=evDate.toISOString().slice(0,10);
+      const inicio=slotToTime(ev.startSlot),fim=slotToTime(ev.endSlot);
+
+      // find existing registro
+      const reg=registros.find(r=>r.data===dateStr&&r.aluno===a.nome&&r.inicio===inicio);
+
+      const dayLabel=DAYS_PT[ev.day];
+      const btnBase=`style="border:none;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',inherit;transition:all .15s"`;
+
+      if(reg){
+        const isFalta=reg.status==='Falta';
+        const isRep=reg.status==='Reposição';
+        const isPres=reg.status==='Presente';
+        return`<div class="wk-slot">
+          <div class="wk-slot-day">${dayLabel}<br><span style="font-size:9px;opacity:.6">${inicio}</span></div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <button ${btnBase} onclick="quickStatus('${reg.id}','Presente')" style="background:${isPres?'#22C55E':'var(--surface2)'};color:${isPres?'#fff':'var(--text2)'}">✅</button>
+            <button ${btnBase} onclick="quickStatus('${reg.id}','Falta')" style="background:${isFalta?'#EF4444':'var(--surface2)'};color:${isFalta?'#fff':'var(--text2)'}">❌</button>
+            <button ${btnBase} onclick="quickStatus('${reg.id}','Reposição')" style="background:${isRep?'#F59E0B':'var(--surface2)'};color:${isRep?'#fff':'var(--text2)'}">🔄</button>
+          </div>
+        </div>`;
+      }else{
+        return`<div class="wk-slot">
+          <div class="wk-slot-day">${dayLabel}<br><span style="font-size:9px;opacity:.6">${inicio}</span></div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <button ${btnBase} onclick="quickAddReg('${a.nome}','${dateStr}','${inicio}','${fim}','${ev.sala}','Presente')" style="background:var(--surface2);color:var(--text2)">✅</button>
+            <button ${btnBase} onclick="quickAddReg('${a.nome}','${dateStr}','${inicio}','${fim}','${ev.sala}','Falta')" style="background:var(--surface2);color:var(--text2)">❌</button>
+            <button ${btnBase} onclick="quickAddReg('${a.nome}','${dateStr}','${inicio}','${fim}','${ev.sala}','Reposição')" style="background:var(--surface2);color:var(--text2)">🔄</button>
+          </div>
+        </div>`;
+      }
+    }).join('');
+
+    if(!slots)return'';
+    return`<div class="wk-row">
+      <div class="wk-label">${wLabel}</div>
+      <div class="wk-slots">${slots}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  return`<div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem">Checklist de presença — últimas semanas</div>
+    ${rows||`<div style="font-size:12px;color:var(--text3)">Nenhuma semana com aulas encontrada.</div>`}
+  </div>`;
+}
+
+function quickStatus(regId,status){
+  const r=registros.find(x=>String(x.id)===String(regId));
+  if(!r)return;
+  r.status=status;
+  saveJ(SK_R,registros);
+  renderAlunos();renderAll();
+  showToast(status==='Presente'?'✅ Presença marcada':status==='Falta'?'❌ Falta marcada':'🔄 Reposição marcada');
+}
+
+function quickAddReg(aluno,data,inicio,fim,sala,status){
+  registros.push({id:nextRid++,data,inicio,fim,aluno,sala,valor:'',pgto:'',status,obs:''});
+  saveJ(SK_R,registros);
+  renderAlunos();renderAll();
+  showToast(status==='Presente'?`✅ Presença — ${aluno}`:status==='Falta'?`❌ Falta — ${aluno}`:`🔄 Reposição — ${aluno}`);
+}
+
 
 function renderHoras(){
   document.getElementById('valor-hora-padrao').value=config.valorHora||'';
