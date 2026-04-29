@@ -17,7 +17,7 @@
   --red-bg:#fee2e2;--red-text:#991b1b;
   --orange-bg:#fff7ed;--orange-text:#9a3412;
   --radius:8px;--radius-lg:12px;
-  --slot:32px;
+  --slot:28px;
 }
 @media(prefers-color-scheme:dark){:root{
   --bg:#1a1a18;--surface:#232320;--surface2:#2c2c2a;
@@ -439,7 +439,7 @@ tr.drag-over td{border-top:2px solid var(--blue) !important;background:var(--blu
 <script>
 /* ── CONSTANTS ── */
 const DAYS=['Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-const TIMES_START=16,TIMES_END=42,SLOT_PX=32;
+const TIMES_START=16,TIMES_END=42,SLOT_PX=28;
 const TOTAL_SLOTS=TIMES_END-TIMES_START;
 const CAL_HEIGHT=TOTAL_SLOTS*SLOT_PX;
 const timeToSlot=t=>{const[h,m]=t.split(':').map(Number);return h*2+(m>=30?1:0)};
@@ -582,58 +582,52 @@ let nextAid=alunos.length?Math.max(...alunos.map(a=>a.id))+1:20;
 let nextRid=registros.length?Math.max(...registros.map(r=>r.id))+1:20;
 let editAid=null,editRid=null,editEvId=null;
 
-function getDefaultEvents(){return[
-  {id:1,day:0,startSlot:26,endSlot:34,label:'8831 - LIVIA ZALA',course:'AutoCAD 25h',sala:'In Company'},
-  {id:2,day:0,startSlot:30,endSlot:31,label:'8711 - MATHEUS VINICIUS',course:'',sala:'VIP 03'},
-  {id:3,day:0,startSlot:31,endSlot:33,label:'8710 - WILLIAM KLEBER',course:'IA + Excel + Canva',sala:'VIP 03'},
-  {id:4,day:0,startSlot:33,endSlot:34,label:'APENAS FILHO MATHEUS',course:'',sala:'VIP 03'},
-  {id:5,day:0,startSlot:34,endSlot:36,label:'5691 - MARIA ALICE',course:'Marketing Digital 15h',sala:'VIP 03'},
-  {id:6,day:0,startSlot:38,endSlot:39,label:'VIP DIOGO',course:'',sala:'Sala 03'},
-  {id:7,day:0,startSlot:39,endSlot:40,label:'8858 - 34',course:'',sala:'Sala 03'},
-  {id:8,day:0,startSlot:40,endSlot:41,label:'VIP DIOGO',course:'',sala:'Sala 03'},
-  {id:9,day:0,startSlot:41,endSlot:42,label:'8858 - 34',course:'',sala:'Sala 03'},
-  {id:10,day:1,startSlot:26,endSlot:30,label:'IN COMPANY',course:'AutoCAD',sala:'In Company'},
-  {id:11,day:1,startSlot:30,endSlot:33,label:'8852 - RYAN PADILHA',course:'30h Programação',sala:'VIP 03'},
-  {id:12,day:1,startSlot:33,endSlot:34,label:'8852 - RYAN PADILHA',course:'30h Programação',sala:'VIP 03'},
-  {id:13,day:1,startSlot:34,endSlot:37,label:'8936 - MARCIO JOSE',course:'Word/Excel/AutoCAD 22h',sala:'VIP 03'},
-  {id:14,day:1,startSlot:37,endSlot:38,label:'8936 - MARCIO JOSE',course:'Word/Excel/AutoCAD 22h',sala:'VIP 03'},
-  {id:15,day:2,startSlot:30,endSlot:31,label:'8711 - MATHEUS VINICIUS',course:'',sala:'VIP 03'},
-  {id:16,day:2,startSlot:31,endSlot:33,label:'8710 - WILLIAM KLEBER',course:'IA + Excel + Canva',sala:'VIP 03'},
-  {id:17,day:2,startSlot:33,endSlot:34,label:'APENAS FILHO MATHEUS',course:'',sala:'VIP 03'},
-  {id:18,day:3,startSlot:30,endSlot:33,label:'8852 - RYAN PADILHA',course:'30h Programação',sala:'VIP 03'},
-  {id:19,day:3,startSlot:33,endSlot:34,label:'8852 - RYAN PADILHA',course:'30h Programação',sala:'VIP 03'},
-  {id:20,day:3,startSlot:34,endSlot:36,label:'5691 - MARIA ALICE',course:'Marketing Digital 15h',sala:'VIP 03'},
-  {id:21,day:3,startSlot:38,endSlot:39,label:'VIP DIOGO',course:'',sala:'Sala 03'},
-  {id:22,day:3,startSlot:39,endSlot:40,label:'8858 - 34',course:'',sala:'Sala 03'},
-  {id:23,day:3,startSlot:40,endSlot:41,label:'VIP DIOGO',course:'',sala:'Sala 03'},
-  {id:24,day:3,startSlot:41,endSlot:42,label:'8858 - 34',course:'',sala:'Sala 03'},
-  {id:25,day:4,startSlot:30,endSlot:32,label:'8936 - MARCIO JOSE',course:'Word/Excel/AutoCAD 22h',sala:'VIP 03'},
-  {id:26,day:4,startSlot:38,endSlot:39,label:'8894 - MARIA EDUARDA',course:'Corel Draw',sala:'VIP 03'},
-  {id:27,day:4,startSlot:39,endSlot:40,label:'COREL DRAW',course:'',sala:'VIP 03'},
-  {id:28,day:4,startSlot:40,endSlot:41,label:'8894 - MARIA EDUARDA',course:'Corel Draw',sala:'VIP 03'},
-  {id:29,day:4,startSlot:41,endSlot:42,label:'COREL DRAW',course:'',sala:'VIP 03'},
+function getDefaultEvents(){
+// Slots: 08:00=16, 09:00=18, 10:00=20, 11:00=22, 12:00=24, 13:00=26,
+//        14:00=28, 15:00=30, 16:00=32, 17:00=34, 18:00=36, 18:30=37,
+//        19:00=38, 20:00=40, 21:00=42
+return[
+  // USP - Experimento todos os dias 08:00-13:00
+  {id:1,day:0,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  {id:2,day:1,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  {id:3,day:2,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  {id:4,day:3,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  {id:5,day:4,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  {id:6,day:5,startSlot:16,endSlot:26,label:'USP - Experimento',course:'Experimento departamento',sala:'In Company'},
+  // Segunda
+  {id:7,day:0,startSlot:30,endSlot:34,label:'8710 - WILLIAM K.',course:'IA + Excel + Canva',sala:'VIP 03'},
+  {id:8,day:0,startSlot:34,endSlot:37,label:'5691 - MARIA ALICE',course:'Marketing Digital 15h',sala:'VIP 03'},
+  {id:9,day:0,startSlot:38,endSlot:42,label:'VIP DIOGO',course:'Hardware',sala:'Sala 03'},
+  // Terça
+  {id:10,day:1,startSlot:26,endSlot:30,label:'Livia',course:'AutoCAD',sala:'In Company'},
+  {id:11,day:1,startSlot:30,endSlot:34,label:'8852 - RYAN PAD.',course:'30h Programação',sala:'VIP 03'},
+  {id:12,day:1,startSlot:34,endSlot:38,label:'8936 - MARCIO J.',course:'Word/Excel/AutoCA...',sala:'VIP 03'},
+  // Quarta
+  {id:13,day:2,startSlot:26,endSlot:30,label:'Alves Martinelli E.',course:'Sistema de controle',sala:'VIP 03'},
+  {id:14,day:2,startSlot:30,endSlot:34,label:'8710 - WILLIAM K.',course:'IA + Excel + Canva',sala:'VIP 03'},
+  // Quinta
+  {id:15,day:3,startSlot:30,endSlot:34,label:'8852 - RYAN PAD.',course:'30h Programação',sala:'VIP 03'},
+  {id:16,day:3,startSlot:34,endSlot:37,label:'5691 - MARIA ALICE',course:'Marketing Digital 15h',sala:'VIP 03'},
+  {id:17,day:3,startSlot:38,endSlot:42,label:'VIP DIOGO',course:'Hardware',sala:'Sala 03'},
+  // Sexta
+  {id:18,day:4,startSlot:30,endSlot:34,label:'8936 - MARCIO J.',course:'Word/Excel/AutoCA...',sala:'VIP 03'},
+  {id:19,day:4,startSlot:38,endSlot:42,label:'COREL DRAW',course:'',sala:'VIP 03'},
+  // Sábado
+  {id:20,day:5,startSlot:30,endSlot:42,label:'ABIN.GOV',course:'',sala:'VIP 03'},
 ];}
 function getDefaultAlunos(){return[
-  {id:1,mat:'8711',nome:'Matheus Vinicius',curso:'IA + Excel + Canva',ch:0,sala:'VIP 03',horas:2,valor:''},
-  {id:2,mat:'8710',nome:'William Kleber',curso:'IA + Excel + Canva',ch:0,sala:'VIP 03',horas:2,valor:''},
-  {id:3,mat:'8831',nome:'Livia Zala',curso:'AutoCAD 25h',ch:25,sala:'In Company',horas:4,valor:''},
-  {id:4,mat:'8852',nome:'Ryan Padilha',curso:'Programação 30h',ch:30,sala:'VIP 03',horas:4,valor:''},
-  {id:5,mat:'5691',nome:'Maria Alice',curso:'Marketing Digital 15h',ch:15,sala:'VIP 03',horas:3,valor:''},
-  {id:6,mat:'8936',nome:'Marcio Jose',curso:'Word/Excel/AutoCAD 22h',ch:22,sala:'VIP 03',horas:3,valor:''},
-  {id:7,mat:'8858',nome:'Turma 34',curso:'Turma 34',ch:0,sala:'Sala 03',horas:2,valor:''},
-  {id:8,mat:'DIOGO',nome:'VIP Diogo',curso:'VIP Individual',ch:0,sala:'Sala 03',horas:2,valor:''},
-  {id:9,mat:'8894',nome:'Maria Eduarda',curso:'Corel Draw',ch:0,sala:'VIP 03',horas:2,valor:''},
-  {id:10,mat:'FILHO',nome:'Filho Matheus',curso:'Acompanhamento',ch:0,sala:'VIP 03',horas:1,valor:''},
+  {id:1,mat:'8710',nome:'William Kleber',curso:'IA + Excel + Canva',ch:0,sala:'VIP 03',horas:4,valor:''},
+  {id:2,mat:'5691',nome:'Maria Alice',curso:'Marketing Digital 15h',ch:15,sala:'VIP 03',horas:3,valor:''},
+  {id:3,mat:'DIOGO',nome:'VIP Diogo',curso:'Hardware',ch:0,sala:'Sala 03',horas:4,valor:''},
+  {id:4,mat:'8831',nome:'Livia Zala',curso:'AutoCAD 25h',ch:25,sala:'In Company',horas:4,valor:''},
+  {id:5,mat:'8852',nome:'Ryan Padilha',curso:'Programação 30h',ch:30,sala:'VIP 03',horas:4,valor:''},
+  {id:6,mat:'8936',nome:'Marcio Jose',curso:'Word/Excel/AutoCAD 22h',ch:22,sala:'VIP 03',horas:4,valor:''},
+  {id:7,mat:'ALVES',nome:'Alves Martinelli',curso:'Sistema de controle',ch:0,sala:'VIP 03',horas:2,valor:''},
+  {id:8,mat:'8894',nome:'Maria Eduarda',curso:'Corel Draw',ch:0,sala:'VIP 03',horas:2,valor:''},
+  {id:9,mat:'USP',nome:'USP - Experimento',curso:'Experimento departamento',ch:0,sala:'In Company',horas:10,valor:''},
+  {id:10,mat:'ABIN',nome:'ABIN.GOV',curso:'',ch:0,sala:'VIP 03',horas:6,valor:''},
 ];}
-function getDefaultRegs(){return[
-  {id:1,data:'2026-04-20',inicio:'15:00',fim:'16:30',aluno:'Matheus Vinicius',sala:'VIP 03',valor:'',pgto:'',status:'Presente',obs:''},
-  {id:2,data:'2026-04-21',inicio:'15:00',fim:'17:00',aluno:'Ryan Padilha',sala:'VIP 03',valor:'',pgto:'',status:'Presente',obs:''},
-  {id:3,data:'2026-04-22',inicio:'15:00',fim:'16:30',aluno:'Matheus Vinicius',sala:'VIP 03',valor:'',pgto:'',status:'Presente',obs:''},
-  {id:4,data:'2026-04-20',inicio:'17:00',fim:'18:30',aluno:'Maria Alice',sala:'VIP 03',valor:'',pgto:'',status:'Presente',obs:''},
-  {id:5,data:'2026-04-21',inicio:'17:00',fim:'18:30',aluno:'Maria Alice',sala:'VIP 03',valor:'',pgto:'',status:'Falta',obs:''},
-  {id:6,data:'2026-04-22',inicio:'17:00',fim:'18:30',aluno:'Maria Alice',sala:'VIP 03',valor:'',pgto:'',status:'Falta',obs:''},
-];}
-
+function getDefaultRegs(){return[];}
 /* ── HELPERS ── */
 const salaClass=s=>s==='VIP 03'?'vip03':s==='Sala 03'?'sala03':'incompany';
 const badgeClass=s=>s==='VIP 03'?'badge-vip':s==='Sala 03'?'badge-sala':'badge-ic';
