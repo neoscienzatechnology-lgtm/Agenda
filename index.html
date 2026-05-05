@@ -1083,8 +1083,8 @@ function onUp(e){document.removeEventListener('mousemove',onMove);document.remov
 function onTUp(e){document.removeEventListener('touchmove',onTMove);document.removeEventListener('touchend',onTUp);const t=e.changedTouches[0];finish(t.clientX,t.clientY)}
 function finish(cx,cy){
   document.querySelectorAll('.drop-active').forEach(el=>el.classList.remove('drop-active'));
-  if(ghost){ghost.remove();ghost=null}
   const tgt=getDT(cx,cy);
+  if(ghost){ghost.remove();ghost=null}
   if(tgt&&dragEv){
     const ns=parseInt(tgt.dataset.slot);
     const col=tgt.closest('.cal-day-col');
