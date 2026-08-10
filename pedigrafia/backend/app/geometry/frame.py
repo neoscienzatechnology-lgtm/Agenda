@@ -72,6 +72,20 @@ def _frame_from_direction(contour_mm: np.ndarray, u: np.ndarray) -> FootFrame:
     return FootFrame(origin=origin, u=u, v=v, length_mm=length)
 
 
+def mean_vertex_spacing_mm(contour_mm: np.ndarray) -> float:
+    """Espaçamento médio entre vértices consecutivos (mm).
+
+    Medido, nunca assumido: ``bootstrap_frame`` recebe o contorno bruto do detector,
+    cuja densidade não é a mesma do passo de reamostragem.
+    """
+    p = poly.as_points(contour_mm)
+    if len(p) < 2:
+        return 1.0
+    d = np.linalg.norm(np.roll(p, -1, axis=0) - p, axis=1)
+    m = float(np.median(d))
+    return m if m > 1e-9 else 1.0
+
+
 def _toe_peak_count(contour_mm: np.ndarray, u: np.ndarray, length: float) -> int:
     """Quantos ápices prominentes existem no extremo apontado por ``u``."""
     settings = get_settings().geometry
@@ -79,13 +93,13 @@ def _toe_peak_count(contour_mm: np.ndarray, u: np.ndarray, length: float) -> int
     top = float(np.max(proj))
     band = top - 0.26 * length
     seq = np.where(proj >= band, proj, band)
+    spacing = mean_vertex_spacing_mm(contour_mm)
     # Duplica o sinal (contorno é circular) e procura picos no trecho central.
     doubled = np.concatenate([seq, seq])
     peaks, _ = find_peaks(
         doubled,
         prominence=settings.toe_peak_min_prominence_mm,
-        distance=max(2, int(settings.toe_peak_min_separation_mm
-                            / max(settings.contour_resample_step_mm, 1e-6))),
+        distance=max(2, int(settings.toe_peak_min_separation_mm / spacing)),
     )
     peaks = peaks[(peaks >= len(seq) // 2) & (peaks < len(seq) // 2 + len(seq))]
     return int(len(peaks))

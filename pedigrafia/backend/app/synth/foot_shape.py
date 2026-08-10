@@ -3,11 +3,12 @@
 O polígono é construído analiticamente (sem imagem), com cinco pododáctilos, arco
 medial côncavo, proeminência da 1ª cabeça metatarsal, borda lateral e calcâneo.
 
-Normalização: o polígono canônico é reescalado uma única vez para que o
+Normalização: a escala do polígono é resolvida iterativamente para que o
 **comprimento medido pelo próprio pipeline** (extensão paralela ao eixo anatômico)
-valha exatamente 1,0. Assim, ``foot_polygon(length_mm=265)`` produz uma figura cujo
-comprimento verdadeiro é 265,000 mm e o teste metrológico compara contra esse valor
-sem circularidade: o que está sob teste é a cadeia imagem → mm, não a definição.
+valha exatamente ``length_mm``. Assim, ``foot_polygon(length_mm=265)`` produz uma
+figura cujo comprimento verdadeiro é 265,000 mm, e o teste metrológico compara contra
+esse valor sem circularidade: o que está sob teste é a cadeia imagem → mm, não a
+definição de comprimento.
 """
 
 from __future__ import annotations
@@ -98,28 +99,48 @@ def _densify(uw: np.ndarray, step: float = 0.004) -> np.ndarray:
 
 
 @lru_cache(maxsize=1)
-def _normalized_canonical() -> np.ndarray:
-    """Canônico reescalado para comprimento medido == 1,0 (mesma definição do pipeline)."""
+def _base_uw() -> np.ndarray:
+    """Polígono canônico denso em unidades de projeto (``u``-extent ≈ 1,005)."""
+    return _densify(_canonical_uw())
+
+
+def _measure_scaled(scale: float) -> float:
+    """Comprimento que o **pipeline** mede para o canônico reescalado por ``scale``.
+
+    Note que os limiares de detecção de pododáctilos são absolutos (em mm), de modo
+    que a medição não é perfeitamente equivariante à escala. Por isso a normalização
+    é resolvida iterativamente **na magnitude real em milímetros**, e não uma única
+    vez em unidades adimensionais.
+    """
     from ..geometry.frame import bootstrap_frame, refine_frame
 
-    uw = _densify(_canonical_uw())
+    uw = _base_uw() * scale
     frame, _ = bootstrap_frame(uw)
-    # Ápice do 2º pododáctilo no modelo, para o refino do eixo anatômico.
-    t2 = np.array(TOE_APEX_UW[1], dtype=np.float64)
+    t2 = np.array(TOE_APEX_UW[1], dtype=np.float64) * scale
     frame = refine_frame(uw, frame, t2)
-    measured = frame.length_mm
-    if measured <= 0:
-        raise RuntimeError("normalização do contorno canônico falhou")
-    return uw / measured
+    return float(frame.length_mm)
 
 
-def canonical_scale_factor() -> float:
-    """Fator entre o ``u``-extent de projeto e o comprimento medido (documentação)."""
-    uw = _densify(_canonical_uw())
-    span = float(uw[:, 0].max() - uw[:, 0].min())
-    norm = _normalized_canonical()
-    span_norm = float(norm[:, 0].max() - norm[:, 0].min())
-    return span_norm / span if span > 0 else 1.0
+@lru_cache(maxsize=64)
+def _scale_for_length(length_mm: float) -> float:
+    """Escala tal que o comprimento medido pelo pipeline seja exatamente ``length_mm``."""
+    scale = float(length_mm)
+    for _ in range(6):
+        measured = _measure_scaled(scale)
+        if measured <= 0:
+            raise RuntimeError("normalização do contorno canônico falhou")
+        correction = length_mm / measured
+        scale *= correction
+        if abs(correction - 1.0) < 1e-12:
+            break
+    return scale
+
+
+def canonical_scale_factor(length_mm: float = 260.0) -> float:
+    """Razão entre o comprimento medido e o ``u``-extent de projeto (documentação)."""
+    scale = _scale_for_length(length_mm)
+    span = float(np.ptp(_base_uw()[:, 0])) * scale
+    return length_mm / span if span > 0 else 1.0
 
 
 def foot_polygon(length_mm: float, laterality: str = "right", view: str = "below",
@@ -136,7 +157,7 @@ def foot_polygon(length_mm: float, laterality: str = "right", view: str = "below
     if view not in ("below", "above"):
         raise ValueError("view deve ser 'below' ou 'above'")
 
-    uw = _normalized_canonical() * float(length_mm)
+    uw = _base_uw() * _scale_for_length(float(length_mm))
     medial_sign = medial_sign_for(laterality, view)
 
     # u aponta para os dedos = -y do plano (dedos para cima na imagem);
@@ -175,7 +196,7 @@ def expected_landmarks_mm(length_mm: float, laterality: str = "right",
     """Landmarks verdadeiros do modelo, no mesmo referencial de :func:`foot_polygon`."""
     # Os landmarks canônicos estão em unidades de projeto; convertem-se com o mesmo
     # fator de normalização aplicado ao polígono.
-    factor = float(length_mm) / _canonical_measured_length()
+    factor = _scale_for_length(float(length_mm))
 
     medial_sign = medial_sign_for(laterality, view)
     theta = np.radians(rotation_deg)
@@ -183,7 +204,7 @@ def expected_landmarks_mm(length_mm: float, laterality: str = "right",
 
     poly_pts = foot_polygon(length_mm, laterality, view,
                             center_mm=center_mm, rotation_deg=rotation_deg)
-    raw = _densify(_canonical_uw()) * factor
+    raw = _base_uw() * factor
     raw_xy = np.stack([raw[:, 1] * medial_sign, -raw[:, 0]], axis=1) @ R.T
     offset = np.asarray(center_mm, float) - raw_xy.mean(axis=0)
     assert np.allclose(raw_xy + offset, poly_pts, atol=1e-9)
@@ -199,12 +220,3 @@ def expected_landmarks_mm(length_mm: float, laterality: str = "right",
     out["heel"] = place((0.0, 0.0))
     return out
 
-
-@lru_cache(maxsize=1)
-def _canonical_measured_length() -> float:
-    from ..geometry.frame import bootstrap_frame, refine_frame
-
-    uw = _densify(_canonical_uw())
-    frame, _ = bootstrap_frame(uw)
-    frame = refine_frame(uw, frame, np.array(TOE_APEX_UW[1], dtype=np.float64))
-    return float(frame.length_mm)

@@ -67,16 +67,20 @@ class QualityThresholds:
     good_megapixels: float = 3.0
 
     # Nitidez / movimento
-    min_focus_score: float = 18.0       # variância do laplaciano normalizada
-    good_focus_score: float = 90.0
-    max_motion_anisotropy: float = 0.62  # 0 = isotrópico, 1 = borrão direcional total
-    good_motion_anisotropy: float = 0.30
+    # Calibrados contra cenas sintéticas nítidas x desfocadas (ver docs/QUALITY.md):
+    # nítida ~47, desfoque leve ~11, desfoque forte ~8, tremor ~26.
+    min_focus_score: float = 20.0       # variância do laplaciano normalizada
+    good_focus_score: float = 46.0
+    max_motion_anisotropy: float = 0.42  # 0 = isotrópico, 1 = borrão direcional total
+    good_motion_anisotropy: float = 0.12
 
     # Exposição
     max_clipped_high_frac: float = 0.06
     max_clipped_low_frac: float = 0.10
-    target_mean_luma: float = 128.0
-    max_mean_luma_deviation: float = 70.0
+    # A luminância média NÃO reprova sozinha: uma plataforma branca bem iluminada
+    # é legitimamente clara. O que reprova é o recorte (clipping) de informação.
+    target_mean_luma: float = 150.0
+    max_mean_luma_deviation: float = 105.0
 
     # Reflexos especulares dentro da área útil
     max_glare_frac: float = 0.045
