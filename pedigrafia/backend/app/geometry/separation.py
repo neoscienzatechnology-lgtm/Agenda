@@ -51,7 +51,10 @@ def split_feet(mask: np.ndarray, rect: Rectification,
         if cpx is None or len(cpx) < 24:
             continue
         if score_field is not None and score_threshold is not None:
-            cpx = contour_mod.refine_subpixel(cpx, score_field, score_threshold)
+            # Janela em unidade física (1,2 mm): independe da resolução do raster.
+            cpx = contour_mod.refine_subpixel(
+                cpx, score_field, score_threshold,
+                max_shift_px=1.2 * rect.px_per_mm)
 
         cmm = rect.rect_px_to_mm(cpx)
         x = int(stats[i, cv2.CC_STAT_LEFT])

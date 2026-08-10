@@ -142,6 +142,7 @@ class FootMeasurements(_Base):
     heelToM1Mm: float = 0.0
     heelToM5Mm: float = 0.0
     metatarsalLineLengthMm: float = 0.0
+    axisParallelLengthMm: float = 0.0
 
 
 class SupportZone(_Base):

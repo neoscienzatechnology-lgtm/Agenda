@@ -125,6 +125,7 @@ def measurements_to_schema(m) -> S.FootMeasurements:
         heelToM1Mm=round(m.heel_to_m1_mm, 2),
         heelToM5Mm=round(m.heel_to_m5_mm, 2),
         metatarsalLineLengthMm=round(m.metatarsal_line_length_mm, 2),
+        axisParallelLengthMm=round(m.axis_parallel_length_mm, 2),
     )
 
 

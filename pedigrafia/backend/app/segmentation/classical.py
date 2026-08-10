@@ -153,6 +153,12 @@ class ClassicalSegmenter:
 
         skin = _skin_evidence(blurred)
         # A pele reforça a distância sem jamais ser condição necessária.
+        #
+        # ATENÇÃO: `score` serve para CLASSIFICAR (o que é pé). Ele NÃO serve para
+        # localizar a borda, porque o reforço multiplicativo da pele liga/desliga
+        # dentro da faixa de transição e destrói a monotonicidade em relação à
+        # cobertura do pixel. A fronteira geométrica é refinada sobre `dist`, que é
+        # aproximadamente linear na fração de cobertura.
         score = dist * (1.0 + 0.35 * skin)
         debug["score"] = np.clip(score, 0, 255).astype(np.uint8)
 
@@ -189,9 +195,39 @@ class ClassicalSegmenter:
             0.55 * separability + 0.25 * min(1.0, contrast / 45.0) + 0.20 * area_ok,
             0.0, 1.0))
 
+        edge_level = self._edge_level(dist, kept, search, float(thr), ctx)
         return SegmentationResult(mask=kept, confidence=confidence, method=self.name,
                                   notes=notes, debug=debug,
-                                  score_field=score, score_threshold=float(thr))
+                                  score_field=dist, score_threshold=edge_level)
+
+    @staticmethod
+    def _edge_level(dist: np.ndarray, mask: np.ndarray, search: np.ndarray,
+                    otsu_threshold: float, ctx: SegmentationContext) -> float:
+        """Nível do campo de distância que corresponde à fronteira geométrica real.
+
+        O limiar de Otsu separa as *classes* (serve para decidir o que é pé), mas não
+        marca a posição da borda: ele cai entre as médias das classes, o que em uma
+        transição suavizada (foto rotacionada, reamostrada ou levemente desfocada)
+        fica **fora** do objeto e dilata o contorno em mais de 1 mm.
+
+        A fronteira de uma borda com meia-cobertura é a isolinha de 50 % entre o
+        nível do fundo e o nível do interior. Como `dist` é aproximadamente linear na
+        fração de cobertura do pixel, essa isolinha coincide com a borda física.
+        """
+        interior = cv2.erode(
+            (mask > 0).astype(np.uint8),
+            cv2.getStructuringElement(
+                cv2.MORPH_ELLIPSE,
+                (2 * max(1, int(round(2.0 * ctx.px_per_mm))) + 1,) * 2),
+        )
+        background = (search > 0) & (mask == 0)
+        if int(np.count_nonzero(interior)) < 200 or int(np.count_nonzero(background)) < 200:
+            return float(otsu_threshold)
+        fg_level = float(np.median(dist[interior > 0]))
+        bg_level = float(np.median(dist[background]))
+        if not np.isfinite(fg_level) or not np.isfinite(bg_level) or fg_level <= bg_level:
+            return float(otsu_threshold)
+        return 0.5 * (fg_level + bg_level)
 
     # ------------------------------------------------------------------ componentes
     def _select_components(self, mask: np.ndarray, gc: np.ndarray | None,

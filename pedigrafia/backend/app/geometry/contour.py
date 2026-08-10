@@ -55,11 +55,16 @@ def all_subpixel_contours_px(mask: np.ndarray) -> list[np.ndarray]:
 
 
 def refine_subpixel(contour_px: np.ndarray, score: np.ndarray, level: float,
-                    max_shift_px: float = 1.5, samples: int = 9) -> np.ndarray:
+                    max_shift_px: float = 1.5, samples: int = 25) -> np.ndarray:
     """Reposiciona cada vértice no cruzamento exato de ``score = level``.
 
     Usa o campo escalar contínuo produzido pelo segmentador em vez da máscara binária.
-    Vértices sem cruzamento único dentro da janela permanecem intocados.
+    A janela de busca precisa ser larga o bastante para alcançar a fronteira
+    geométrica real: a máscara binarizada por Otsu pode estar alguns pixels dilatada
+    em capturas suavizadas (rotação da câmera, reamostragem, leve desfoque).
+
+    Havendo mais de um cruzamento na janela, escolhe-se o **mais próximo** do vértice
+    original — mover para uma borda distante seria trocar de estrutura, não refinar.
     """
     if score is None or contour_px is None or len(contour_px) < 4:
         return contour_px
@@ -96,17 +101,22 @@ def refine_subpixel(contour_px: np.ndarray, score: np.ndarray, level: float,
     for i in range(len(p)):
         r = rel[i]
         sign_changes = np.nonzero(np.diff(np.sign(r)) != 0)[0]
-        if len(sign_changes) != 1:
+        if len(sign_changes) == 0:
             continue
-        k = int(sign_changes[0])
-        denom = r[k + 1] - r[k]
-        if abs(denom) < 1e-12:
-            continue
-        t = -r[k] / denom
-        shift = offsets[k] + t * (offsets[k + 1] - offsets[k])
-        if abs(shift) > max_shift_px:
-            continue
-        out[i] = p[i] + normal[i] * shift
+        best_shift = None
+        for k in sign_changes:
+            k = int(k)
+            denom = r[k + 1] - r[k]
+            if abs(denom) < 1e-12:
+                continue
+            t = -r[k] / denom
+            shift = offsets[k] + t * (offsets[k + 1] - offsets[k])
+            if abs(shift) > max_shift_px:
+                continue
+            if best_shift is None or abs(shift) < abs(best_shift):
+                best_shift = shift
+        if best_shift is not None:
+            out[i] = p[i] + normal[i] * best_shift
     return out
 
 

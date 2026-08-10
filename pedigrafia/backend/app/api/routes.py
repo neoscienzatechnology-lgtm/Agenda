@@ -13,7 +13,7 @@ from .. import schemas as S
 from ..config import get_settings
 from ..image_io import decode_image, encode_png
 from ..pdf.builder import CONTOUR_RGB, build_foot_pdf, build_marker_sheet_pdf
-from ..pdf.inspect import inspect_pdf, path_axis_length_mm
+from ..pdf.inspect import inspect_pdf, path_axis_length_mm, path_max_caliper_mm
 from ..pipeline import PipelineBlocked, analyze
 from ..render.annotated import AnnotatedRenderer
 from ..security import UploadRejected, new_review_token, validate_upload
@@ -325,7 +325,7 @@ async def verify_pdf(file: UploadFile = File(...),
             message="Contorno plantar não encontrado no PDF.")
 
     path = max(paths, key=lambda p: len(p.points_mm))
-    length = path_axis_length_mm(path, np.array([0.0, 1.0]))
+    length = path_max_caliper_mm(path)
     width = path_axis_length_mm(path, np.array([1.0, 0.0]))
     pts = path.points_mm
     error = abs(length - declaredLengthMm)

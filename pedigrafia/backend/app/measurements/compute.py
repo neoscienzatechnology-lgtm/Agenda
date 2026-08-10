@@ -6,9 +6,20 @@ Nenhuma conversão de unidade acontece aqui.
 Definições (fixadas e documentadas para que sejam reproduzíveis):
 
 ``lengthMm``
-    Extensão paralela ao eixo longitudinal, do ponto mais posterior do calcâneo ao
-    ponto mais distal dos pododáctilos. É a medida equivalente à de um dispositivo
-    tipo Brannock (dois planos paralelos perpendiculares ao eixo).
+    Distância do ponto mais posterior do calcâneo ao ponto mais distal dos
+    pododáctilos — o diâmetro do fecho convexo da projeção plantar.
+
+    **Por que não a extensão paralela ao eixo:** a largura do pé é ~40 % do
+    comprimento, então a extensão paralela ao eixo varia
+    ``L·cos δ + W·sen δ`` com o ângulo do eixo: 1° de oscilação do eixo move a
+    medida em ~1,8 mm. Como o eixo anatômico é estimado (e editável), essa medida
+    não seria reprodutível entre capturas. O diâmetro do fecho convexo é um
+    **máximo**, portanto estacionário: perturbações de primeira ordem não o alteram.
+    Também é exatamente a definição pedida ("do ponto mais posterior do calcâneo até
+    o dedo mais distal"), que não menciona eixo.
+
+``axisParallelLengthMm``
+    A extensão paralela ao eixo, mantida como valor auxiliar interno.
 
 ``forefootWidthMm``
     Largura máxima da secção transversal na faixa t ∈ [0,55; 0,88] — a "bola" do pé.
@@ -66,7 +77,7 @@ class Measurements:
     heel_to_m1_mm: float = 0.0
     heel_to_m5_mm: float = 0.0
     metatarsal_line_length_mm: float = 0.0
-    max_caliper_length_mm: float = 0.0
+    axis_parallel_length_mm: float = 0.0
     warnings: list[str] = field(default_factory=list)
 
 
@@ -94,8 +105,11 @@ def compute_measurements(contour_mm: np.ndarray, frame: FootFrame,
     dense = poly.resample_closed(contour_mm, 0.5)
     uv = frame.to_local(dense)
 
-    length = float(np.max(uv[:, 0]) - np.min(uv[:, 0]))
+    axis_parallel_length = float(np.max(uv[:, 0]) - np.min(uv[:, 0]))
     bbox_width = float(np.max(uv[:, 1]) - np.min(uv[:, 1]))
+    # Comprimento oficial: diâmetro do fecho convexo (estacionário, independente do
+    # eixo). Ver a docstring do módulo para a justificativa metrológica.
+    length, _, _ = poly.max_caliper(dense)
 
     forefoot, forefoot_t = _extreme_width(uv, frame, g.forefoot_band, "max")
     midfoot, midfoot_t = _extreme_width(uv, frame, g.midfoot_band, "min")
@@ -122,8 +136,6 @@ def compute_measurements(contour_mm: np.ndarray, frame: FootFrame,
     if arch.warning:
         warnings.append(arch.warning)
 
-    caliper, _, _ = poly.max_caliper(dense)
-
     meas = Measurements(
         length_mm=length,
         forefoot_width_mm=forefoot,
@@ -133,8 +145,8 @@ def compute_measurements(contour_mm: np.ndarray, frame: FootFrame,
         arch_index=arch.value,
         plantar_area_mm2=float(poly.area(dense)),
         bbox_width_mm=bbox_width,
-        bbox_length_mm=length,
-        axis_length_mm=length,
+        bbox_length_mm=axis_parallel_length,
+        axis_length_mm=axis_parallel_length,
         orientation_deg=frame.orientation_deg,
         forefoot_width_at_t=forefoot_t,
         midfoot_width_at_t=midfoot_t,
@@ -145,7 +157,7 @@ def compute_measurements(contour_mm: np.ndarray, frame: FootFrame,
         heel_to_m1_mm=heel_to_m1,
         heel_to_m5_mm=heel_to_m5,
         metatarsal_line_length_mm=mt_len,
-        max_caliper_length_mm=float(caliper),
+        axis_parallel_length_mm=axis_parallel_length,
         warnings=warnings,
     )
     return meas, arch

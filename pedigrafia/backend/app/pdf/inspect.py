@@ -214,6 +214,18 @@ def path_axis_length_mm(path: PdfPath, direction: np.ndarray | None = None) -> f
     return float(np.max(proj) - np.min(proj))
 
 
+def path_max_caliper_mm(path: PdfPath) -> float:
+    """Diâmetro do caminho — mesma definição de comprimento usada nas medidas.
+
+    Independe de como o pé ficou girado na página, o que torna a verificação do PDF
+    imune à convenção de posicionamento.
+    """
+    from ..geometry.polygon import max_caliper
+
+    length, _, _ = max_caliper(path.points_mm)
+    return float(length)
+
+
 def path_bbox_mm(path: PdfPath) -> tuple[float, float, float, float]:
     pts = path.points_mm
     return (float(pts[:, 0].min()), float(pts[:, 1].min()),

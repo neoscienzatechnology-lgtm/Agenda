@@ -107,18 +107,14 @@ def _base_uw() -> np.ndarray:
 def _measure_scaled(scale: float) -> float:
     """Comprimento que o **pipeline** mede para o canônico reescalado por ``scale``.
 
-    Note que os limiares de detecção de pododáctilos são absolutos (em mm), de modo
-    que a medição não é perfeitamente equivariante à escala. Por isso a normalização
-    é resolvida iterativamente **na magnitude real em milímetros**, e não uma única
-    vez em unidades adimensionais.
+    A normalização é resolvida iterativamente para tolerar qualquer não-linearidade
+    da definição de comprimento em relação à escala.
     """
-    from ..geometry.frame import bootstrap_frame, refine_frame
+    from ..geometry.polygon import max_caliper
 
-    uw = _base_uw() * scale
-    frame, _ = bootstrap_frame(uw)
-    t2 = np.array(TOE_APEX_UW[1], dtype=np.float64) * scale
-    frame = refine_frame(uw, frame, t2)
-    return float(frame.length_mm)
+    # Mesma definição do pipeline: diâmetro do fecho convexo.
+    length, _, _ = max_caliper(_base_uw() * scale)
+    return float(length)
 
 
 @lru_cache(maxsize=64)
