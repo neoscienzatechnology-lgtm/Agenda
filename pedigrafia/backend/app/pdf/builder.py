@@ -21,6 +21,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas as pdfcanvas
 
 from ..config import MM_TO_PT, get_settings
+from ..geometry.polygon import as_xy
 from .geometry_page import PagePlacement, compute_placement
 
 # Cor reservada EXCLUSIVAMENTE ao contorno plantar. O verificador de PDF localiza o
@@ -46,8 +47,8 @@ class PdfBuildResult:
     warnings: list[str]
 
 
-def _pt(pts_mm: np.ndarray, placement: PagePlacement) -> np.ndarray:
-    return placement.to_page_pt(pts_mm)
+def _pt(pts_mm, placement: PagePlacement) -> np.ndarray:
+    return placement.to_page_pt(as_xy(pts_mm))
 
 
 def _draw_polygon(c: pdfcanvas.Canvas, pts_pt: np.ndarray, *, close: bool = True,
@@ -72,7 +73,7 @@ def build_foot_pdf(*, contour_mm, axis_a_mm, axis_b_mm, laterality: str,
                    include_metatarsals: bool = True, include_axis: bool = True,
                    include_measurements: bool = True) -> PdfBuildResult:
     settings = get_settings()
-    contour = np.asarray(contour_mm, dtype=np.float64).reshape(-1, 2)
+    contour = as_xy(contour_mm)
     if len(contour) < 3:
         raise ValueError("contorno com menos de 3 pontos")
 
@@ -101,7 +102,7 @@ def build_foot_pdf(*, contour_mm, axis_a_mm, axis_b_mm, laterality: str,
     # ---------------------------------------------------------- zonas de apoio
     if include_support_zones and support_zones:
         for zone in support_zones:
-            poly_mm = np.asarray(zone.get("polygonMm", []), dtype=np.float64)
+            poly_mm = as_xy(zone.get("polygonMm"))
             if len(poly_mm) < 3:
                 continue
             c.saveState()
@@ -115,14 +116,14 @@ def build_foot_pdf(*, contour_mm, axis_a_mm, axis_b_mm, laterality: str,
     if include_arches:
         for pts, rgb, dash in ((medial_arch_mm, MEDIAL_ARCH_RGB, (3, 2)),
                                (lateral_arch_mm, LATERAL_ARCH_RGB, (1.5, 2))):
-            if pts is None or len(pts) < 2:
+            pts = as_xy(pts)
+            if len(pts) < 2:
                 continue
             c.saveState()
             c.setStrokeColorRGB(*rgb)
             c.setLineWidth(0.6)
             c.setDash(list(dash))
-            _draw_polygon(c, _pt(np.asarray(pts, dtype=np.float64), placement),
-                          close=False)
+            _draw_polygon(c, _pt(pts, placement), close=False)
             c.restoreState()
 
     # ------------------------------------------------------------------- eixo
@@ -137,12 +138,12 @@ def build_foot_pdf(*, contour_mm, axis_a_mm, axis_b_mm, laterality: str,
 
     # ---------------------------------------------------- linha e cabeças MT
     if include_metatarsals:
-        if metatarsal_line_mm is not None and len(metatarsal_line_mm) >= 2:
+        mt_pts = as_xy(metatarsal_line_mm)
+        if len(mt_pts) >= 2:
             c.saveState()
             c.setStrokeColorRGB(*METATARSAL_RGB)
             c.setLineWidth(0.6)
-            _draw_polygon(c, _pt(np.asarray(metatarsal_line_mm, dtype=np.float64),
-                                 placement), close=False)
+            _draw_polygon(c, _pt(mt_pts, placement), close=False)
             c.restoreState()
         if landmarks:
             c.saveState()

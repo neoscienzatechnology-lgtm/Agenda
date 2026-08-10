@@ -12,6 +12,23 @@ import numpy as np
 Array = np.ndarray
 
 
+def as_xy(points) -> Array:
+    """Normaliza pontos vindos como ``[x, y]`` ou como ``{"x": …, "y": …}``.
+
+    O contrato da API usa objetos ``PointMm``; o núcleo geométrico usa arrays. Esta
+    é a única fronteira entre as duas representações.
+    """
+    if points is None:
+        return np.empty((0, 2))
+    seq = list(points)
+    if not seq:
+        return np.empty((0, 2))
+    if isinstance(seq[0], dict):
+        return np.array([[float(p["x"]), float(p["y"])] for p in seq],
+                        dtype=np.float64)
+    return np.asarray(seq, dtype=np.float64).reshape(-1, 2)
+
+
 def as_points(pts) -> Array:
     arr = np.asarray(pts, dtype=np.float64)
     if arr.ndim != 2 or arr.shape[1] != 2:
