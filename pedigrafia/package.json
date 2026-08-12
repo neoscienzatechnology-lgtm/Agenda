@@ -1,0 +1,15 @@
+{
+  "name": "pedigrafia-digital",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pedigrafia Digital — testes end-to-end no navegador",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:desktop": "playwright test --project=desktop",
+    "e2e:mobile": "playwright test --project=mobile",
+    "e2e:scene": "python .venv/bin/python tests/e2e/make_scene.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

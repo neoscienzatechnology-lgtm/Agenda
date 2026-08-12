@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pedigrafia-vision"
+version = "1.0.0"
+description = "Adaptadores de modelos de segmentação para o Pedigrafia Digital"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26", "opencv-contrib-python-headless>=4.10"]
+
+[project.optional-dependencies]
+onnx = ["onnxruntime>=1.17"]
+train = ["torch>=2.2", "torchvision>=0.17", "albumentations>=1.4", "tqdm>=4.66"]
+
+[tool.setuptools.packages.find]
+include = ["pedigrafia_vision*"]
