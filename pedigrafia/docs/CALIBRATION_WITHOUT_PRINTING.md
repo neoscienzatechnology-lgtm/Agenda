@@ -96,6 +96,25 @@ razão, o que é da ordem do erro em (a).
 Confundir cartão com folha A4 erra a escala em **2,45×**. O molde sairia coerente,
 bonito e completamente errado.
 
+### O que separa o retângulo certo dos quadriláteros falsos
+
+Dois filtros, ambos diretos:
+
+1. **Resíduo do ajuste das arestas.** As quatro arestas que o candidato afirma ter
+   precisam existir. Medido em cena sintética: o cartão correto ajusta suas retas com
+   resíduo de **0,15 px**; recortes espúrios do `approxPolyDP` ficam em **6,7–8,7 px**.
+   O corte em 2,0 px separa os dois grupos com folga.
+2. **Razão de aspecto**, contra a dimensão declarada, com a tolerância vinda da
+   própria incerteza da medida.
+
+Um terceiro filtro — plausibilidade da distância focal recuperada — foi implementado
+e depois **removido por medição**. Quanto mais perpendicular a fotografia (que é
+exatamente o que o sistema pede ao operador), mais `f` tende ao infinito, e o limite
+superior passava a rejeitar o candidato certo: numa cena de 1,6° de inclinação o
+cartão correto saía com `f/máx = 6,5` e era descartado, enquanto um quadrilátero
+espúrio sobrevivia por acaso. Um teste que falha justamente na condição recomendada
+de captura não é um teste.
+
 Por isso: **o modo automático se recusa a escolher** quando a forma não prova de qual
 objeto se trata, e a interface pede que o operador declare. Não é burocracia — é a
 única barreira real contra a falha silenciosa mais perigosa deste caminho.

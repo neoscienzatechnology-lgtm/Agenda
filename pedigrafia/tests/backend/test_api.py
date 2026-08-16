@@ -119,7 +119,13 @@ def test_bad_capture_is_rejected_with_reasons(client):
     assert not body["captureQuality"]["passed"]
 
 
-def test_capture_without_marker_is_rejected(client):
+def test_capture_without_any_scale_reference_is_rejected(client):
+    """Sem referência física não há escala — e a mensagem tem de dizer isso.
+
+    O sistema aceita duas origens de escala (alvo impresso ou objeto normalizado),
+    então o bloqueio não pode falar só de "marcador": tem de explicar que uma
+    fotografia sozinha não contém tamanho e listar os dois caminhos.
+    """
     import cv2
 
     blank = np.full((1200, 900, 3), 235, np.uint8)
@@ -128,7 +134,9 @@ def test_capture_without_marker_is_rejected(client):
     res = client.post("/api/analyze",
                       files={"image": ("f.png", buf.tobytes(), "image/png")})
     assert res.status_code == 422
-    assert any("arcador" in b for b in res.json()["captureQuality"]["blockers"])
+    blockers = res.json()["captureQuality"]["blockers"]
+    assert any("referência de dimensão conhecida" in b for b in blockers)
+    assert any("alvo impresso" in b for b in blockers)
 
 
 # ------------------------------------------------ revisão obrigatória e export

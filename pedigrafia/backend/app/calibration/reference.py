@@ -61,6 +61,13 @@ de ida-e-volta, serialização — trate a referência como trata um marcador.""
 _UNIT_SQUARE = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
                         dtype=np.float32)
 
+MAX_EDGE_RMS_PX = 2.0
+"""Resíduo máximo do ajuste das retas das arestas, em pixels.
+
+É o filtro que separa um retângulo real de um recorte espúrio do ``approxPolyDP``:
+o candidato correto ajusta suas quatro arestas com resíduo de fração de pixel, e um
+quadrilátero que não segue nenhuma borda reta fica em vários pixels."""
+
 
 # --------------------------------------------------------------------------- catálogo
 
@@ -458,9 +465,15 @@ def _intersect(l1: np.ndarray, l2: np.ndarray) -> np.ndarray | None:
     return np.linalg.solve(A, np.array([l1[2], l2[2]], dtype=np.float64))
 
 
-def refine_quad(gray: np.ndarray, quad: np.ndarray,
-                corner_radius_px: float = 0.0) -> tuple[np.ndarray, float]:
-    """Cantos subpixel por interseção das quatro retas das arestas."""
+def refine_quad(gray: np.ndarray, quad: np.ndarray, corner_radius_px: float = 0.0
+                ) -> tuple[np.ndarray, float, bool]:
+    """Cantos subpixel por interseção das quatro retas das arestas.
+
+    Devolve ``(quad, rms_do_ajuste_px, refinado)``. O terceiro campo importa: quando
+    o refino é recusado, o quadrilátero devolvido é o palpite grosseiro do
+    ``approxPolyDP``, que em uma forma de cantos arredondados corta os vértices para
+    dentro. Sem esse sinal, um candidato ruim se disfarçaria de bom.
+    """
     sides = [float(np.linalg.norm(quad[(i + 1) % 4] - quad[i])) for i in range(4)]
     lines: list[np.ndarray | None] = []
     rms: list[float] = []
@@ -473,19 +486,21 @@ def refine_quad(gray: np.ndarray, quad: np.ndarray,
         rms.append(got[1] if got else float("nan"))
 
     if any(line is None for line in lines):
-        return quad, float("nan")
+        return quad, float("nan"), False
 
     refined = []
     for i in range(4):
         pt = _intersect(lines[(i - 1) % 4], lines[i])
-        refined.append(quad[i] if pt is None else pt)
+        if pt is None:
+            return quad, float(np.nanmean(rms)), False
+        refined.append(pt)
     refined_arr = np.array(refined, dtype=np.float64)
 
-    # Segurança: o refino corrige fração de pixel; deslocamento grande é sintoma de
-    # aresta ajustada em outra borda (moldura, sombra) e é descartado.
-    if float(np.max(np.linalg.norm(refined_arr - quad, axis=1))) > 0.10 * min(sides):
-        return quad, float(np.nanmean(rms))
-    return refined_arr, float(np.nanmean(rms))
+    # Segurança: o refino corrige o corte dos cantos arredondados e fração de pixel.
+    # Deslocamento maior que isso é sintoma de reta ajustada em outra borda.
+    if float(np.max(np.linalg.norm(refined_arr - quad, axis=1))) > 0.18 * min(sides):
+        return quad, float(np.nanmean(rms)), False
+    return refined_arr, float(np.nanmean(rms)), True
 
 
 # --------------------------------------------------------------------- resultado
@@ -623,7 +638,15 @@ def detect_reference(bgr: np.ndarray, *, declared: str | None = None,
             # aspecto. Serve só para dimensionar o `trim` das arestas, que é limitado
             # a [0,10 ; 0,33] — a imprecisão não sai daí.
             radius_px = ref.corner_radius_mm * first_side_px / max(ref.width_mm, 1e-6)
-            refined, rms = refine_quad(gray, quad, radius_px)
+            refined, rms, sharpened = refine_quad(gray, quad, radius_px)
+
+            # Filtro decisivo: as quatro arestas que o quadrilátero afirma ter
+            # precisam existir de verdade. Um resíduo de ajuste de vários pixels
+            # significa que não há borda reta ali — é um recorte espúrio do
+            # `approxPolyDP`. Medido: candidato correto 0,15 px, espúrios 6,7–8,7 px.
+            if not sharpened or not np.isfinite(rms) or rms > MAX_EDGE_RMS_PX:
+                continue
+
             ordered, ratio, sigma, focal = _assign_orientation(
                 refined, ref, (width, height))
             err = abs(ratio - ref.aspect) / ref.aspect
@@ -638,13 +661,15 @@ def detect_reference(bgr: np.ndarray, *, declared: str | None = None,
                 else 0.12
             if err > tol:
                 continue
-            # Distância focal implausível denuncia um quadrilátero que não é a
-            # projeção de um retângulo (é a única checagem NÃO circular disponível).
-            if np.isfinite(focal):
-                fr = focal / max(width, height)
-                if not (0.35 <= fr <= 6.0):
-                    continue
-
+            # Aqui existia um terceiro filtro, pela plausibilidade da distância focal
+            # recuperada. Foi REMOVIDO por medição: quanto mais perpendicular a foto
+            # — que é exatamente o que o sistema pede ao operador —, mais `f` tende ao
+            # infinito, e o limite superior passava a rejeitar o candidato certo. Em
+            # uma cena de 1,6° de inclinação o cartão correto saía com f/máx = 6,5 e
+            # era descartado, enquanto um quadrilátero espúrio sobrevivia por acaso.
+            # Os dois filtros que ficaram — resíduo das arestas e razão de aspecto —
+            # são diretos e não degeneram com a vista frontal. `focal_px` continua no
+            # candidato, como diagnóstico.
             gap = _discrimination_gap(ref, full_cat)
             identifiable = bool(np.isfinite(sigma) and 3.0 * sigma < 0.5 * gap)
 
@@ -797,8 +822,8 @@ def verify_reference_round_trip(rectification, target) -> tuple[list[float], flo
     if ref is None:
         return [], float("inf")
 
-    image = rectification.image
-    height, width = image.shape[:2]
+    gray = cv2.cvtColor(rectification.image, cv2.COLOR_BGR2GRAY)
+    radius_px = ref.corner_radius_mm * rectification.px_per_mm
     diagonal = math.hypot(ref.width_mm, ref.height_mm)
     measured: list[float] = []
     errors: list[float] = []
@@ -806,7 +831,7 @@ def verify_reference_round_trip(rectification, target) -> tuple[list[float], flo
     for placement in target.markers:
         expected_px = np.asarray(
             rectification.mm_to_rect_px(placement.corners_mm()), dtype=np.float64)
-        found_px = _redetect_near(image, expected_px, ref, (width, height))
+        found_px = _measure_quad_at(gray, expected_px, radius_px)
         if found_px is None:
             return [], float("inf")
 
@@ -827,41 +852,48 @@ def verify_reference_round_trip(rectification, target) -> tuple[list[float], flo
     return measured, float(max(errors))
 
 
-def _redetect_near(image: np.ndarray, expected_px: np.ndarray, ref: ReferenceObject,
-                   size: tuple[int, int]) -> np.ndarray | None:
-    """Reencontra o objeto perto de onde ele deveria estar, na imagem retificada.
+def _measure_quad_at(gray: np.ndarray, expected_px: np.ndarray,
+                     corner_radius_px: float) -> np.ndarray | None:
+    """Mede as arestas do objeto **na posição esperada**, sem procurá-lo de novo.
 
-    Primeiro tenta um recorte ao redor da posição esperada — é o caminho barato e
-    imune ao contorno da região válida da retificada, que é um quadrilátero e
-    competiria como candidato. Se o recorte não resolver (tipicamente porque a folga
-    até a borda da janela retificada é menor que a margem pedida, e aí o objeto
-    encosta na borda do recorte), repete na imagem inteira e escolhe o candidato mais
-    próximo da posição esperada.
+    Na imagem retificada não há nada a descobrir: a posição do objeto em mm é
+    conhecida por construção, e o que se quer verificar é se a retificação a
+    preservou. Rodar o detector genérico aqui seria pior — ele tem de decidir entre
+    quadriláteros concorrentes (o contorno da região válida, sombras, o próprio
+    recorte) e às vezes escolhe o errado, produzindo uma reprovação falsa.
+
+    Aqui as quatro retas das arestas são ajustadas a partir do palpite exato e
+    intersectadas. Devolve ``None`` — o que reprova a captura — se alguma aresta não
+    puder ser ajustada ou se o objeto estiver longe demais de onde deveria estar,
+    porque nesse caso a calibração realmente não é confiável.
     """
-    width, height = size
-    side_px = float(np.min(np.linalg.norm(
-        np.roll(expected_px, -1, axis=0) - expected_px, axis=1)))
-    centre = expected_px.mean(axis=0)
-
-    margin = 0.30 * side_px
-    lo = np.maximum(expected_px.min(axis=0) - margin, 0.0).astype(int)
-    hi = np.minimum(expected_px.max(axis=0) + margin,
-                    [width - 1, height - 1]).astype(int)
-    if hi[0] - lo[0] >= 40 and hi[1] - lo[1] >= 40:
-        det = detect_reference(image[lo[1]:hi[1] + 1, lo[0]:hi[0] + 1],
-                               declared=ref.key, max_objects=1)
-        if det.found:
-            return det.detection.corners_px + lo
-
-    det = detect_reference(image, declared=ref.key, max_objects=4)
-    if not det.found:
+    sides = [float(np.linalg.norm(expected_px[(i + 1) % 4] - expected_px[i]))
+             for i in range(4)]
+    if min(sides) < 24.0:
         return None
-    near = [c for c in det.candidates
-            if float(np.linalg.norm(c.corners_px.mean(axis=0) - centre)) < 0.5 * side_px]
-    if not near:
+
+    lines: list[np.ndarray] = []
+    for i in range(4):
+        trim = float(np.clip(
+            max(0.12, 2.2 * corner_radius_px / max(sides[i], 1.0)), 0.12, 0.33))
+        got = _fit_edge_line(gray, expected_px[i], expected_px[(i + 1) % 4], trim)
+        if got is None:
+            return None
+        lines.append(got[0])
+
+    measured = []
+    for i in range(4):
+        point = _intersect(lines[(i - 1) % 4], lines[i])
+        if point is None:
+            return None
+        measured.append(point)
+    quad = np.array(measured, dtype=np.float64)
+
+    # A busca perpendicular varre poucos pixels ao redor da aresta esperada; um
+    # deslocamento grande significa que a reta ajustada é outra borda.
+    if float(np.max(np.linalg.norm(quad - expected_px, axis=1))) > 0.20 * min(sides):
         return None
-    return min(near, key=lambda c: float(
-        np.linalg.norm(c.corners_px.mean(axis=0) - centre))).corners_px
+    return quad
 
 
 def _overlaps(a: np.ndarray, b: np.ndarray) -> bool:
