@@ -1,8 +1,9 @@
 # Pedigrafia Digital
 
 PWA para produzir um **molde plantar em escala 1:1 real** a partir de uma fotografia
-de podoscópio, com a dimensão física derivada exclusivamente de um marcador fiducial
-de **50,00 × 50,00 mm**.
+de podoscópio, com a dimensão física derivada exclusivamente de uma referência de
+dimensão conhecida na cena — um marcador fiducial impresso de **50,00 × 50,00 mm**
+ou um objeto normalizado (cartão ISO/IEC 7810, folha A4).
 
 > **O número do calçado nunca dimensiona nada.** Ele existe apenas como conferência
 > de sanidade. Se a calibração medir 264,3 mm, o PDF sai com 264,3 mm.
@@ -21,6 +22,9 @@ de **50,00 × 50,00 mm**.
 | Cadeia metrológica marcador → mm | Verificada: erro de ida-e-volta 0,005–0,072 mm |
 | Comprimento fim a fim — alvo de 4 marcadores | **−0,064 mm média, 0,137 mm pior caso** (inclinação até 24°) |
 | Comprimento fim a fim — marcador único | −0,14 mm média, 1,30 mm pior caso |
+| Comprimento fim a fim — sem impressora: folha A4 | −0,23 mm média, **0,30 mm pior caso** (+ tolerância do papel) |
+| Comprimento fim a fim — sem impressora: cartão | +0,13 mm média, 1,14 mm pior caso |
+| Incerteza herdada do padrão físico (não removível) | cartão ±0,64 mm · folha A4 ±2,52 mm, em um pé de 265 mm |
 | PDF A4 1:1 relido do arquivo | erro 0,0000 mm em 200/240/260/265/270 mm |
 | Testes | 132 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
 | Validação com hardware/pés reais | **não realizada** — ver `docs/VALIDATION_CHECKLIST.md` |
@@ -36,7 +40,7 @@ pedigrafia/
 ├── frontend/         PWA React + TypeScript + Vite (editor vetorial em canvas)
 ├── backend/          API FastAPI + pipeline de visão (OpenCV/NumPy/scikit-image)
 │   └── app/
-│       ├── calibration/   alvo multi-marcador, homografia por mínimos quadrados, px→mm
+│       ├── calibration/   alvo multi-marcador, retângulo normalizado, homografia, px→mm
 │       ├── quality/       métricas objetivas e quality gate 0–100
 │       ├── segmentation/  interface plugável + clássico + ponte ONNX
 │       ├── geometry/      polígonos em mm, frame do pé, contorno sub-pixel
@@ -88,12 +92,16 @@ coordenadas indicadas em cada folha, ao redor da área de apoio.
 Um objeto de dimensão normalizada serve de referência: **cartão** de 85,60 × 53,98 mm
 (ISO/IEC 7810 ID-1) ou **folha A4**. Basta declarar qual foi usado na captura.
 
-O custo é medido e reportado, não escondido: o cartão é pequeno, então a escala volta a
-ser extrapolada (quatro cartões ao redor dos pés resolvem, pela mesma geometria do alvo
-impresso); e a folha A4 carrega ±2 mm de tolerância de corte, ou seja ±2,5 mm em um pé
-de 265 mm, que nenhum algoritmo remove. **Moeda e régua foram recusadas** — o porquê,
-com a aritmética, está em
-[`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md).
+O custo é medido e reportado, não escondido:
+
+* o **cartão** é pequeno, então a escala volta a ser extrapolada — quatro cartões ao
+  redor dos pés trazem a cobertura ao nível do alvo impresso;
+* a **folha A4** é geometricamente a melhor referência sem impressora (0,30 mm de pior
+  caso), mas carrega ±2 mm de tolerância de corte, ou seja ±2,5 mm em um pé de 265 mm,
+  que nenhum algoritmo remove. Medir a folha com paquímetro e declarar as dimensões
+  reais elimina esse termo;
+* **moeda e régua foram recusadas** — o porquê, com a aritmética, está em
+  [`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md).
 
 ## Princípios que o código impõe
 

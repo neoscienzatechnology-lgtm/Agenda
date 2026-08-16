@@ -200,27 +200,80 @@ esse requisito fique visível no teste em vez de virar suposição.
 ## 5. Exatidão medida
 
 Metodologia idêntica à de `METROLOGY_CALIBRATION.md`: cenas sintéticas de geometria
-conhecida, inclinação de 0 a 24°, rolagem ±15°, distância de 520 a 1050 mm, ruído
-σ = 1–5. Erro de comprimento = maior corda do casco convexo (medida estacionária).
+conhecida, 8 cenas por configuração (2 pés cada), inclinação de 0 a 24°, rolagem
+±15°, distância de 520 a 1050 mm, ruído σ = 1–5. Erro de comprimento = maior corda do
+casco convexo, que é a medida estacionária. Pés emparelhados com a verdade por
+**lateralidade** (invariante ao referencial), não por posição.
 
-<!-- RESULTADOS -->
+| Calibração | Erro médio | Desvio-padrão | Pior caso | Extrapolação | Pés medidos |
+|---|---|---|---|---|---|
+| Alvo impresso, 4 marcadores | −0,063 mm | 0,029 mm | **0,126 mm** | 21 mm | 10/16 |
+| Marcador impresso único | +0,310 mm | 0,459 mm | 1,491 mm | 303 mm | 15/16 |
+| **Cartão × 1** | +0,133 mm | 0,512 mm | 1,142 mm | 290 mm | 14/16 |
+| **Cartão × 2** | −0,085 mm | 1,575 mm | 4,893 mm ¹ | 153 mm | 12/16 |
+| **Cartão × 4** | −0,678 mm | 0,067 mm | 0,750 mm | 29 mm | 8/16 |
+| **Folha A4 × 1** | −0,226 mm | 0,045 mm | **0,296 mm** | 266 mm | 16/16 |
+
+¹ Não é erro de ajuste conjunto: nessa cena **só um** dos dois cartões foi detectado,
+e o sistema caiu para calibração de objeto único com 295 mm de extrapolação. Nas sete
+cenas em que os dois cartões foram realmente encontrados, o erro ficou entre +0,61 e
++0,88 mm. O sistema reporta o número de objetos usados (`calibration.markerCount`) e a
+distância de extrapolação; são esses os sinais a conferir.
+
+### Três leituras honestas destes números
+
+**1. A folha A4 ganha em geometria e perde em tolerância.** Ela é grande, então a
+homografia fica bem-condicionada: ±0,30 mm no pior caso, melhor que o marcador
+impresso único. Mas o corte do papel traz ±2 mm de incerteza (§1), que **domina** o
+resultado: o erro total de uma folha A4 é de ordem 2,5 mm, dez vezes o erro
+geométrico. Medir a folha com paquímetro e declarar as dimensões reais elimina esse
+termo e transforma a A4 na melhor opção sem impressora.
+
+**2. O erro do cartão está no piso da própria norma.** As configurações de cartão
+convergem para um viés sistemático de ~0,7 mm — da mesma ordem que a tolerância
+ISO/IEC 7810 de ±0,64 mm em um pé de 265 mm. Abaixo disso não adianta refinar
+geometria: o padrão físico é o limite.
+
+**3. O resíduo do ajuste NÃO estima exatidão.** Medido em 14 cenas de dois cartões, a
+correlação entre resíduo máximo e erro de comprimento é **−0,20** — ou seja, nenhuma.
+O resíduo é um teste de **consistência** (os objetos concordam com uma única
+homografia e com a forma declarada?), e é isso que o *quality gate* usa. Quem prevê
+exatidão é a **cobertura**: número de objetos e distância de extrapolação.
+
+### Rendimento das capturas, e por que ele não é o do produto
+
+A coluna "pés medidos" mostra que parte das cenas é reprovada. A causa foi
+investigada e **não é a calibração**: os bloqueios são `feet_detected` /
+`foot_bg_contrast`, isto é, falha de segmentação. Verificado diretamente — cenas
+bloqueadas voltam a passar apenas **alargando a plataforma sintética**, com a mesma
+câmera, a mesma geometria e a mesma calibração. Com objetos de referência grandes ou
+numerosos, o enquadramento automático do gerador abre o campo até sobrar piso escuro
+demais na foto, e o segmentador clássico inverte a polaridade.
+
+É uma limitação do **arcabouço de teste**, não do produto — e o rendimento em
+fotografia real é desconhecido, porque não há fotografia real. O comportamento do
+sistema nesses casos é conservador: recusa a captura em vez de entregar medida ruim.
 
 ---
 
 ## 6. Como usar na prática
 
-**Sem impressora, o melhor arranjo:** quatro cartões iguais, um em cada canto da área
-de apoio, no mesmo plano da planta (sobre o vidro do podoscópio, ao lado dos pés).
-Declare "Cartão" na captura.
+**A melhor opção sem impressora:** uma **folha A4 medida com paquímetro**, com as
+dimensões reais declaradas em `PEDIGRAFIA_REFERENCE_CUSTOM_MM="209.4x296.7@0.2"`.
+Isso remove o termo de erro dominante (±2 mm de corte) e deixa apenas o erro
+geométrico, que é o menor da tabela: ±0,30 mm.
+
+**Sem paquímetro:** quatro cartões iguais, um em cada canto da área de apoio, no
+mesmo plano da planta (sobre o vidro do podoscópio, ao lado dos pés). Declare
+"Cartão" na captura. A tolerância do cartão é 15× menor que a do papel.
 
 **Com um cartão só:** funciona, e o sistema informa a distância em que está
 extrapolando. Serve para conferência; para fabricação, prefira o alvo impresso ou
 mais objetos.
 
-**Folha A4:** cobre bem a área, mas carrega ±2 mm de tolerância de corte. Se for usar,
-**meça a folha com paquímetro** e informe as dimensões reais
-(`PEDIGRAFIA_REFERENCE_CUSTOM_MM="209.4x296.7@0.2"`) — isso elimina o termo dominante
-de erro dessa opção.
+**Folha A4 sem medir:** cobre bem a área e é geometricamente a melhor referência,
+mas os ±2 mm de tolerância de corte viram ±2,5 mm no molde — dez vezes o erro
+geométrico. Use apenas se essa incerteza couber no seu processo.
 
 **Regra geral:** o objeto precisa estar plano, inteiro, no mesmo plano físico das
 plantas, e nunca sobreposto aos pés.
