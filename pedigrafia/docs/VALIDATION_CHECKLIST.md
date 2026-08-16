@@ -22,7 +22,26 @@ digital 0,01 mm), o marcador impresso, superfície rígida e plana, impressora A
       Papel ondulado introduz erro de perspectiva local.
 - [ ] Mantenha a borda branca (zona de silêncio) ao redor do quadrado.
 
-## Etapa 1 — Posicionar o marcador no plano correto
+## Etapa 0b — Se for calibrar por objeto normalizado (sem impressora)
+
+Aplica-se a quem escolher "Cartão" ou "Folha A4" na captura. Ver
+`CALIBRATION_WITHOUT_PRINTING.md`.
+
+- [ ] **Meça o objeto com paquímetro**, nos dois eixos, antes de usá-lo. Um cartão
+      deve dar 85,60 × 53,98 mm; uma folha A4, 210 × 297 mm.
+- [ ] Se divergir mais que a tolerância da norma (cartão ±0,13 mm, papel ±2 mm),
+      **use as dimensões medidas** em `PEDIGRAFIA_REFERENCE_CUSTOM_MM` em vez das
+      nominais. Isso remove o termo de erro dominante da folha A4.
+- [ ] Cartão sem empenamento, sem relevo alto (números em alto-relevo não atrapalham
+      a borda, mas deformam o plástico se o cartão estiver velho).
+- [ ] O objeto **não** encosta nem se sobrepõe aos pés.
+- [ ] Prefira **quatro cartões**, um em cada canto da área de apoio: é o que faz a
+      escala interpolar em vez de extrapolar.
+- [ ] Confira, na tela de revisão, que o painel **Calibração** mostra o objeto que
+      você realmente usou. Declarar o objeto errado produz uma medida coerente e
+      proporcionalmente errada — não há verificação interna que detecte isso.
+
+## Etapa 1 — Posicionar a referência no plano correto
 
 - [ ] O marcador está **no mesmo plano físico da planta do pé** (sobre o vidro do
       podoscópio, não abaixo dele, não sobre um degrau).

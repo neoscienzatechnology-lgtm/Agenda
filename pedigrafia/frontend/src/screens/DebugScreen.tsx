@@ -15,6 +15,7 @@ export function DebugScreen({
 }) {
   const m = analysis.marker
   const r = analysis.rectification
+  const c = analysis.calibration
   return (
     <div className="debug-screen">
       <div className="debug-head">
@@ -25,11 +26,23 @@ export function DebugScreen({
       </div>
 
       <section className="debug-section">
-        <h3>Marcador e escala</h3>
+        <h3>Referência e escala</h3>
         <dl className="kv">
           <Item k="Detectado" v={m.detected ? 'sim' : 'não'} />
+          <Item k="Origem da escala" v={c?.source === 'reference' ? 'objeto normalizado' : 'marcador impresso'} />
           <Item k="Dicionário / id" v={`${m.dictionary} · ${m.markerId}`} />
-          <Item k="Aresta física" v={`${m.sizeMm.toFixed(2)} mm`} />
+          <Item
+            k="Dimensão física"
+            v={
+              c?.reference
+                ? `${c.reference.widthMm} × ${c.reference.heightMm} mm (${c.reference.standard}, ±${c.reference.toleranceMm} mm)`
+                : `${m.sizeMm.toFixed(2)} mm de aresta`
+            }
+          />
+          <Item
+            k="Incerteza herdada do padrão"
+            v={c ? `± ${c.scaleToleranceMm.toFixed(2)} mm (${(c.scaleToleranceRel * 100).toFixed(2)} %)` : '—'}
+          />
           <Item k="Amostragem na foto" v={`${m.srcPxPerMm.toFixed(2)} px/mm`} />
           <Item k="Distorção do quadrilátero" v={m.skew.toFixed(4)} />
           <Item k="Inclinação estimada" v={`${m.tiltDeg.toFixed(1)}°`} />

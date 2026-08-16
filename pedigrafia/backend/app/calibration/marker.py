@@ -58,6 +58,12 @@ class MarkerDetection:
 
     É a partir desta lista que a calibração multi-marcador monta os pontos de
     controle distribuídos pela plataforma."""
+    source: str = "aruco"
+    """``aruco`` (marcador impresso) ou ``reference`` (objeto de dimensão normalizada).
+
+    O resto do pipeline trata os dois igualmente — são quatro cantos com posição
+    física conhecida. O campo existe para que a interface e os avisos possam dizer
+    ao profissional de onde veio a escala."""
 
     @property
     def detected_ids(self) -> list[int]:
@@ -114,22 +120,30 @@ def _quad_metrics(corners: np.ndarray) -> tuple[tuple[float, ...], float, float]
 
 
 def estimate_tilt_deg(corners_px: np.ndarray, image_shape: tuple[int, int],
-                      marker_size_mm: float) -> float:
+                      marker_size_mm: float,
+                      model_mm: Optional[np.ndarray] = None) -> float:
     """Inclinação aproximada do plano do marcador em relação ao plano da imagem.
 
     Sem calibração intrínseca da câmera assumimos uma distância focal plausível
     (``f ≈ 1.15 · max(dimensão)``, típico de câmeras de celular). O valor resultante é
     **estimado** e usado apenas como sinal de qualidade — jamais para medir.
+
+    ``model_mm`` permite passar um modelo não quadrado (um retângulo de referência,
+    por exemplo); omitido, assume o quadrado de ``marker_size_mm``.
     """
     h, w = image_shape[:2]
     f = 1.15 * max(w, h)
     cx, cy = w / 2.0, h / 2.0
     K = np.array([[f, 0, cx], [0, f, cy], [0, 0, 1]], dtype=np.float64)
 
-    obj = np.array(
-        [[0, 0], [marker_size_mm, 0], [marker_size_mm, marker_size_mm], [0, marker_size_mm]],
-        dtype=np.float64,
-    )
+    if model_mm is None:
+        obj = np.array(
+            [[0, 0], [marker_size_mm, 0], [marker_size_mm, marker_size_mm],
+             [0, marker_size_mm]],
+            dtype=np.float64,
+        )
+    else:
+        obj = np.asarray(model_mm, dtype=np.float64).reshape(4, 2)
     try:
         H = cv2.getPerspectiveTransform(obj.astype(np.float32),
                                         corners_px.astype(np.float32))

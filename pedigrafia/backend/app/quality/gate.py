@@ -94,49 +94,59 @@ def evaluate_capture(decoded: DecodedImage, marker: MarkerDetection) -> QualityR
     bgr = decoded.bgr
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 
-    # ---------------------------------------------------------------- marcador
+    # ------------------------------------------------- referência física de escala
+    is_reference = marker.source == "reference"
+    noun = "Objeto de referência" if is_reference else "Marcador de referência"
+    fallback_hint = (
+        marker.reason or
+        "Marcador de 50 × 50 mm não encontrado. Mantenha-o inteiro e visível.")
     report.add(Check(
-        id="marker_detected", label="Marcador de referência detectado",
+        id="marker_detected", label=f"{noun} detectado",
         passed=marker.found, score=1.0 if marker.found else 0.0,
         severity="blocker" if q.require_marker else "warning", group="marker",
-        hint="" if marker.found else
-             "Marcador de 50 × 50 mm não encontrado. Mantenha-o inteiro e visível.",
+        hint="" if marker.found else fallback_hint,
     ))
     if not marker.found:
-        report.add(Check(id="marker_corners", label="Quatro cantos visíveis",
-                         passed=False, score=0.0, severity="blocker", group="marker",
-                         hint="Sem marcador não há escala física."))
+        report.add(Check(
+            id="marker_corners", label="Quatro cantos visíveis",
+            passed=False, score=0.0, severity="blocker", group="marker",
+            hint=("Sem uma referência de dimensão conhecida não existe escala "
+                  "física: uma fotografia sozinha não contém tamanho. Use o alvo "
+                  "impresso ou deixe um objeto padronizado (cartão, folha A4) "
+                  "inteiro e no mesmo plano dos pés.")))
         return report
 
     report.add(Check(
-        id="marker_corners", label="Quatro cantos do marcador visíveis",
+        id="marker_corners", label=f"Quatro cantos {'do objeto' if is_reference else 'do marcador'} visíveis",
         passed=True, score=1.0, severity="info", group="marker",
     ))
     report.add(Check(
-        id="marker_not_clipped", label="Marcador inteiro no enquadramento",
+        id="marker_not_clipped", label=f"{noun} inteiro no enquadramento",
         passed=not marker.touches_border,
         score=0.0 if marker.touches_border else 1.0,
         severity="blocker" if q.require_marker_inside_frame else "warning",
         group="marker",
-        hint="O marcador encosta na borda da foto; afaste-se ou recentralize.",
+        hint=f"{noun} encosta na borda da foto; afaste-se ou recentralize.",
     ))
     report.add(Check(
-        id="marker_skew", label="Marcador sem deformação excessiva",
+        id="marker_skew", label=f"{noun} sem deformação excessiva",
         passed=marker.skew <= q.max_marker_skew,
         score=_ramp(marker.skew, q.max_marker_skew, 0.02),
         value=marker.skew, threshold=q.max_marker_skew,
         severity="blocker", group="marker",
-        hint="Marcador muito distorcido: fotografe mais de frente.",
+        hint=f"{noun} muito distorcido: fotografe mais de frente.",
     ))
 
     # ---------------------------------------------------------------- resolução
     report.add(Check(
-        id="resolution_px_per_mm", label="Amostragem sobre o marcador",
+        id="resolution_px_per_mm",
+        label=f"Amostragem sobre {'o objeto' if is_reference else 'o marcador'}",
         passed=marker.src_px_per_mm >= q.min_src_px_per_mm,
         score=_ramp(marker.src_px_per_mm, q.min_src_px_per_mm, q.good_src_px_per_mm),
         value=marker.src_px_per_mm, threshold=q.min_src_px_per_mm,
         severity="blocker", group="resolution",
-        hint="Resolução insuficiente sobre o marcador — aproxime a câmera.",
+        hint=f"Resolução insuficiente sobre {'o objeto' if is_reference else 'o marcador'}"
+             " de referência — aproxime a câmera.",
     ))
     report.add(Check(
         id="megapixels", label="Resolução da imagem",
@@ -267,7 +277,7 @@ def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
     ))
 
     report.add(Check(
-        id="scale_round_trip", label="Escala verificada (marcadores re-medidos)",
+        id="scale_round_trip", label="Escala verificada (referência re-medida)",
         passed=round_trip_error_mm <= 0.5,
         score=_ramp(round_trip_error_mm, 0.5, 0.05),
         value=round_trip_error_mm, threshold=0.5,
@@ -281,16 +291,21 @@ def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
     # medido de até 2 mm com marcador único (ver docs/METROLOGY_CALIBRATION.md).
     warn = settings.max_extrapolation_warn_mm
     block = settings.max_extrapolation_block_mm
+    from_reference = getattr(calibration, "target_name", "") == "reference"
+    remedy = ("Espalhe mais objetos iguais ao redor da área de apoio: com quatro, "
+              "a calibração volta a interpolar em vez de extrapolar."
+              if from_reference else
+              "Use um alvo com quatro marcadores ao redor da área de apoio "
+              "(GET /api/marker.pdf?target=board4).")
     report.add(Check(
         id="calibration_coverage", label="Pés dentro da área calibrada",
         passed=extrapolation_mm <= block,
         score=_ramp(extrapolation_mm, block, 0.0),
         value=extrapolation_mm, threshold=warn,
         severity="blocker", group="marker",
-        hint=(f"Os pés estão a {extrapolation_mm:.0f} mm fora da região coberta pelos "
-              f"marcadores: a escala está sendo EXTRAPOLADA e a exatidão cai com a "
-              f"distância. Use um alvo com quatro marcadores ao redor da área de "
-              f"apoio (GET /api/marker.pdf?target=board4)."),
+        hint=(f"Os pés estão a {extrapolation_mm:.0f} mm fora da região coberta pela "
+              f"referência: a escala está sendo EXTRAPOLADA e a exatidão cai com a "
+              f"distância. {remedy}"),
     ))
     if calibration is not None and not calibration.exact:
         report.add(Check(
@@ -299,7 +314,11 @@ def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
             score=_ramp(calibration.residual_max_mm, 1.0, 0.05),
             value=calibration.residual_max_mm, threshold=1.0,
             severity="blocker", group="marker",
-            hint=("Os marcadores não são consistentes com o alvo declarado. Confira "
+            hint=("Os objetos detectados não são consistentes com a dimensão "
+                  "declarada. Confirme qual referência foi usada e que ela está "
+                  "plana, inteira e no mesmo plano dos pés."
+                  if from_reference else
+                  "Os marcadores não são consistentes com o alvo declarado. Confira "
                   "as posições físicas no arquivo do alvo, com paquímetro."),
         ))
     return report

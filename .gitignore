@@ -9,3 +9,4 @@ pedigrafia/**/test-results/
 pedigrafia/**/playwright-report/
 pedigrafia/tests/e2e/scene.jpg
 pedigrafia/tests/e2e/scene.png
+*.tsbuildinfo

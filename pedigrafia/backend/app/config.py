@@ -152,6 +152,14 @@ class Settings:
     marker_dictionary: str = "DICT_4X4_50"
     marker_id: int = -1                     # -1 = aceita qualquer id do dicionário
     calibration_target: str = "auto"        # auto | single | board4 | caminho .json
+    # Referência de dimensão normalizada usada quando NÃO há marcador ArUco na foto
+    # (cartão ISO/IEC 7810, folha A4, …). `off` desativa o caminho alternativo.
+    reference_object: str = "auto"          # auto | off | card | a4 | a5 | "LxA"
+    reference_custom_mm: str = ""           # ex.: "85.6x53.98@0.1" (tolerância em mm)
+    # Tolerância dimensional assumida para o alvo IMPRESSO, depois de o profissional
+    # conferi-lo com régua/paquímetro. Entra na incerteza de escala reportada — é um
+    # erro que nenhum processamento de imagem remove.
+    printed_target_tolerance_mm: float = 0.20
     # Fora do casco convexo dos pontos de controle a homografia EXTRAPOLA, e o erro
     # cresce com a distância. Estes limiares transformam isso em aviso e bloqueio.
     max_extrapolation_warn_mm: float = 60.0
@@ -214,6 +222,9 @@ def get_settings() -> Settings:
         marker_dictionary=_env("marker_dictionary", "DICT_4X4_50", str),
         marker_id=_env("marker_id", -1, int),
         calibration_target=_env("target", "auto", str),
+        reference_object=_env("reference_object", "auto", str),
+        reference_custom_mm=_env("reference_custom_mm", "", str),
+        printed_target_tolerance_mm=_env("printed_target_tolerance_mm", 0.20, float),
         max_extrapolation_warn_mm=_env("max_extrapolation_warn_mm", 60.0, float),
         max_extrapolation_block_mm=_env("max_extrapolation_block_mm", 450.0, float),
         rectified_px_per_mm=_env("rectified_px_per_mm", 6.0, float),

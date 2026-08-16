@@ -87,7 +87,25 @@ e de borramento, está em **`METROLOGY_CALIBRATION.md`**.
 * As **posições físicas** dos marcadores na plataforma são o que calibra o sistema.
   Meça-as com paquímetro e ajuste o arquivo do alvo — não confie no desenho.
 
-### 2.1 Erro residual após a correção
+### 2.1 Calibração por objeto de dimensão normalizada
+
+Quando a escala vem de um cartão ou de uma folha em vez do alvo impresso, somam-se
+**duas** limitações que não existem com ArUco:
+
+1. **A tolerância do próprio objeto é um piso de erro.** Cartão ISO/IEC 7810 ID-1:
+   ±0,13 mm → ±0,64 mm em um pé de 265 mm. Folha A4 (ISO 216): ±2 mm → **±2,52 mm**.
+   Nenhum processamento de imagem remove esse termo; é reportado em
+   `calibration.scaleToleranceMm`.
+2. **Não há como verificar a identidade do objeto.** O código de um ArUco é
+   verificável; um retângulo não é. Declarar "A4" para uma foto de cartão produz uma
+   medida internamente coerente e 2,45× errada. A única barreira é o limite físico de
+   comprimento plantar (90–400 mm), que reprova a captura — e a declaração explícita
+   exigida na interface.
+
+Detalhes, aritmética e números medidos em `CALIBRATION_WITHOUT_PRINTING.md`. Moeda e
+régua foram avaliadas e **recusadas**; o motivo está no mesmo documento.
+
+### 2.2 Erro residual após a correção
 
 Com o tabuleiro, o que resta (±0,11 mm, sistematicamente negativo) é erro de
 segmentação: a fronteira do contorno cai fração de milímetro para dentro. É uma ordem

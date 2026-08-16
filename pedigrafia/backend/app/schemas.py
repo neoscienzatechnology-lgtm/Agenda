@@ -55,6 +55,20 @@ class MarkerInfo(_Base):
     roundTripErrorMm: float = 0.0
 
 
+class ReferenceObjectInfo(_Base):
+    """Objeto de dimensão normalizada usado no lugar do marcador impresso."""
+
+    key: str
+    label: str
+    widthMm: float
+    heightMm: float
+    toleranceMm: float
+    standard: str
+    note: str = ""
+    scaleToleranceRel: float = 0.0
+    """Incerteza relativa de escala imposta pela tolerância do próprio objeto."""
+
+
 class CalibrationInfo(_Base):
     """Como a escala física foi estabelecida — e o quanto ela está extrapolando."""
 
@@ -69,6 +83,16 @@ class CalibrationInfo(_Base):
     extrapolationMm: float = 0.0
     """Distância dos pés até o casco dos pontos de controle. 0 = interpolado."""
     interpolated: bool = False
+    source: str = "aruco"
+    """``aruco`` (marcador impresso) ou ``reference`` (objeto de dimensão normalizada)."""
+    reference: Optional[ReferenceObjectInfo] = None
+    scaleToleranceRel: float = 0.0
+    """Incerteza de escala herdada do padrão físico, que nenhum algoritmo remove."""
+    scaleToleranceMm: float = 0.0
+    """A mesma incerteza aplicada ao maior pé medido, em mm."""
+    controlPointsMm: list[PointMm] = Field(default_factory=list)
+    """Cantos usados como pontos de controle, no plano em mm — permitem à interface
+    mostrar exatamente de onde veio a escala."""
     warnings: list[str] = Field(default_factory=list)
 
 

@@ -32,7 +32,8 @@ def _prepare_path() -> None:
 
 
 def run_benchmark(scenes: int = 40, seed: int = 3, model: str | None = None,
-                  use_board: bool = True) -> dict:
+                  use_board: bool = True, reference: str | None = None,
+                  reference_count: int = 1) -> dict:
     _prepare_path()
     if model:
         os.environ["PEDIGRAFIA_SEGMENTER"] = "onnx"
@@ -63,18 +64,30 @@ def run_benchmark(scenes: int = 40, seed: int = 3, model: str | None = None,
             noise_sigma=float(rng.uniform(1.0, 6.0)),
             seed=int(rng.integers(0, 2**31 - 1)),
         )
-        spec = (G.board_scene(left, right, **kwargs) if use_board
-                else G.bilateral_scene(left, right, **kwargs))
+        if reference:
+            spec = G.reference_scene(left, right, key=reference,
+                                     count=reference_count, **kwargs)
+        elif use_board:
+            spec = G.board_scene(left, right, **kwargs)
+        else:
+            spec = G.bilateral_scene(left, right, **kwargs)
         scene = G.render_scene(spec)
         try:
             result = analyze(DecodedImage(scene.image_bgr, 1, scene.image_bgr.shape[1],
-                                          scene.image_bgr.shape[0]))
+                                          scene.image_bgr.shape[0]),
+                             calibration=reference or "aruco")
         except PipelineBlocked:
             blocked += 1
             continue
 
         feet = sorted(result.feet, key=lambda f: float(f.component.centroid_mm[0]))
-        for foot, truth in zip(feet, scene.truth_contours_mm):
+        if len(feet) != len(scene.truth_contours_mm):
+            # Emparelhar pé medido com contorno de verdade errado inventaria erro;
+            # é mais honesto contar a cena como perdida.
+            blocked += 1
+            continue
+        truths = sorted(scene.truth_contours_mm, key=lambda c: float(c[:, 0].mean()))
+        for foot, truth in zip(feet, truths):
             truth_len, _, _ = poly.max_caliper(truth)
             got_len, _, _ = poly.max_caliper(foot.contour_high_res_mm)
             length_errors.append(got_len - truth_len)
@@ -103,9 +116,13 @@ def run_benchmark(scenes: int = 40, seed: int = 3, model: str | None = None,
             "p95AbsMm": round(float(np.percentile(np.abs(arr), 95)), 4),
         }
 
+    if reference:
+        target_name = f"{reference}×{reference_count}"
+    else:
+        target_name = "board4" if use_board else "single"
     return {
         "segmenter": model or "classical",
-        "target": "board4" if use_board else "single",
+        "target": target_name,
         "scenes": scenes,
         "blocked": blocked,
         "length": stats(length_errors),
@@ -121,9 +138,15 @@ def main() -> None:
     ap.add_argument("--model", default=None, help="caminho de um .onnx")
     ap.add_argument("--single-marker", action="store_true",
                     help="usa o alvo de marcador único em vez do tabuleiro")
+    ap.add_argument("--reference", default=None,
+                    help="calibra por objeto normalizado: card, a4, a5")
+    ap.add_argument("--reference-count", type=int, default=1,
+                    help="quantos objetos de referência espalhar pela área (1–4)")
     args = ap.parse_args()
     report = run_benchmark(args.scenes, args.seed, args.model,
-                           use_board=not args.single_marker)
+                           use_board=not args.single_marker,
+                           reference=args.reference,
+                           reference_count=args.reference_count)
     print(json.dumps(report, indent=1, ensure_ascii=False))
 
 

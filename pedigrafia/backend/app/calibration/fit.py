@@ -127,6 +127,140 @@ def fit_homography(detection: MarkerDetection,
     )
 
 
+def fit_free_rectangles(detection: MarkerDetection, model_mm: np.ndarray
+                        ) -> tuple[HomographyFit, list[tuple[float, float, float]]]:
+    """Homografia a partir de N retângulos **de pose desconhecida** e forma conhecida.
+
+    É o caso do objeto de referência: sabemos que cada objeto mede exatamente
+    ``model_mm``, mas não onde ele foi largado sobre a plataforma nem em que ângulo.
+
+    Com **um** retângulo o problema é exatamente determinado (4 pontos, 8 graus de
+    liberdade) e vale a mesma ressalva do marcador único: resíduo zero por
+    construção, exatidão que decai com a distância.
+
+    Com **dois ou mais** vale a pena resolver junto: as incógnitas passam a ser a
+    homografia (8) mais a pose no plano de cada objeto extra (3 cada), contra 8
+    resíduos por objeto — sobra informação. O segundo objeto, colocado do outro lado
+    dos pés, estende o casco dos pontos de controle e transforma extrapolação em
+    interpolação, que é exatamente a correção que o alvo de quatro marcadores faz
+    sem exigir impressão.
+
+    O referencial em mm é o do primeiro objeto (origem no seu canto TL), o que fixa
+    a liberdade global de similaridade.
+
+    Devolve ``(ajuste, poses)``, com ``poses`` = ``(x_mm, y_mm, rotação_graus)`` de
+    cada objeto no referencial resolvido.
+    """
+    if not detection.found or not detection.markers:
+        raise CalibrationFitError("nenhum objeto de referência detectado")
+
+    model = np.asarray(model_mm, dtype=np.float64).reshape(4, 2)
+    quads = [np.asarray(m.corners_px, dtype=np.float64).reshape(4, 2)
+             for m in detection.markers]
+    ids = tuple(int(m.marker_id) for m in detection.markers)
+    warnings: list[str] = []
+
+    H0 = cv2.getPerspectiveTransform(quads[0].astype(np.float32),
+                                     model.astype(np.float32)).astype(np.float64)
+    poses: list[tuple[float, float, float]] = [(0.0, 0.0, 0.0)]
+    for quad in quads[1:]:
+        mapped = cv2.perspectiveTransform(quad.reshape(-1, 1, 2), H0).reshape(-1, 2)
+        poses.append(_rigid_from_model(model, mapped))
+
+    if len(quads) == 1:
+        H = H0
+        exact = True
+        warnings.append(
+            "Calibração com um único objeto de referência: a escala é exata sobre "
+            "ele e extrapolada para o resto da plataforma. Objetos iguais adicionais "
+            "reduzem a extrapolação; com quatro, ao redor da área de apoio, ela "
+            "desaparece — dois apenas cobrem uma faixa, não uma área.")
+    else:
+        H, poses = _solve_joint(quads, model, H0, poses)
+        exact = False
+
+    src_pts = np.vstack(quads)
+    dst_pts = np.vstack([_place(model, p) for p in poses])
+    projected = cv2.perspectiveTransform(src_pts.reshape(-1, 1, 2), H).reshape(-1, 2)
+    residuals = np.linalg.norm(projected - dst_pts, axis=1)
+
+    fit = HomographyFit(
+        homography_image_to_mm=H,
+        control_points_px=src_pts,
+        control_points_mm=dst_pts,
+        used_marker_ids=ids,
+        residual_rms_mm=float(np.sqrt(np.mean(residuals ** 2))),
+        residual_max_mm=float(np.max(residuals)),
+        target_name="reference",
+        exact=exact,
+        warnings=warnings,
+    )
+    return fit, poses
+
+
+def _place(model: np.ndarray, pose: tuple[float, float, float]) -> np.ndarray:
+    x, y, deg = pose
+    a = np.radians(deg)
+    R = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+    return model @ R.T + np.array([x, y], dtype=np.float64)
+
+
+def _rigid_from_model(model: np.ndarray, observed: np.ndarray
+                      ) -> tuple[float, float, float]:
+    """Procrustes sem escala: rotação + translação que levam ``model`` a ``observed``."""
+    mc, oc = model.mean(axis=0), observed.mean(axis=0)
+    A = (model - mc).T @ (observed - oc)
+    U, _, Vt = np.linalg.svd(A)
+    R = (U @ Vt).T
+    if np.linalg.det(R) < 0:                      # nunca espelha o padrão físico
+        Vt = Vt.copy()
+        Vt[-1] *= -1.0
+        R = (U @ Vt).T
+    angle = float(np.degrees(np.arctan2(R[1, 0], R[0, 0])))
+    t = oc - R @ mc
+    return (float(t[0]), float(t[1]), angle)
+
+
+def _solve_joint(quads: list[np.ndarray], model: np.ndarray, H0: np.ndarray,
+                 poses0: list[tuple[float, float, float]]
+                 ) -> tuple[np.ndarray, list[tuple[float, float, float]]]:
+    """Mínimos quadrados não linear sobre (homografia, poses dos objetos extras)."""
+    from scipy.optimize import least_squares
+
+    h0 = (H0 / H0[2, 2]).ravel()[:8]
+    extra0 = np.array([v for pose in poses0[1:] for v in pose], dtype=np.float64)
+    x0 = np.concatenate([h0, extra0])
+    n_extra = len(quads) - 1
+
+    def unpack(x):
+        H = np.append(x[:8], 1.0).reshape(3, 3)
+        poses = [(0.0, 0.0, 0.0)]
+        for k in range(n_extra):
+            px, py, pa = x[8 + 3 * k: 11 + 3 * k]
+            poses.append((float(px), float(py), float(pa)))
+        return H, poses
+
+    def residual(x):
+        H, poses = unpack(x)
+        out = []
+        for quad, pose in zip(quads, poses):
+            hom = np.concatenate([quad, np.ones((4, 1))], axis=1) @ H.T
+            w = hom[:, 2]
+            if np.any(np.abs(w) < 1e-9):
+                return np.full(8 * len(quads), 1e6)
+            out.append((hom[:, :2] / w[:, None]) - _place(model, pose))
+        return np.concatenate(out).ravel()
+
+    try:
+        sol = least_squares(residual, x0, method="lm", max_nfev=4000)
+    except (ValueError, np.linalg.LinAlgError):
+        return H0, poses0
+    H, poses = unpack(sol.x)
+    if not np.isfinite(H).all():
+        return H0, poses0
+    return H, poses
+
+
 def extrapolation_distance_mm(fit: HomographyFit, points_mm: np.ndarray) -> float:
     """Maior distância de ``points_mm`` até o casco dos pontos de controle.
 

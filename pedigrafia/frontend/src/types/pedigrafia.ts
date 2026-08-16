@@ -26,6 +26,17 @@ export interface MarkerInfo {
   roundTripErrorMm: number
 }
 
+export interface ReferenceObjectInfo {
+  key: string
+  label: string
+  widthMm: number
+  heightMm: number
+  toleranceMm: number
+  standard: string
+  note: string
+  scaleToleranceRel: number
+}
+
 export interface CalibrationInfo {
   targetName: string
   markerCount: number
@@ -36,6 +47,13 @@ export interface CalibrationInfo {
   coverageSpanMm: number[]
   extrapolationMm: number
   interpolated: boolean
+  /** `aruco` (marcador impresso) ou `reference` (objeto de dimensão normalizada). */
+  source: string
+  reference: ReferenceObjectInfo | null
+  /** Incerteza de escala herdada do padrão físico — nenhum algoritmo a remove. */
+  scaleToleranceRel: number
+  scaleToleranceMm: number
+  controlPointsMm: PointMm[]
   warnings: string[]
 }
 

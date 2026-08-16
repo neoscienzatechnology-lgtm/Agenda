@@ -118,7 +118,19 @@ chegava a +2,07 mm; com o tabuleiro, fica em ±0,11 mm.
 * O modo de marcador único **continua funcionando**, com aviso explícito: quem já tem
   um marcador colado não fica sem sistema, apenas sem a exatidão máxima.
 
-## 7. Lição que vale para o resto do projeto
+## 7. A mesma geometria, sem impressora
+
+O diagnóstico acima não depende de o ponto de controle ser um ArUco. Qualquer
+retângulo de dimensão normalizada — um cartão ISO/IEC 7810, uma folha A4 — fornece a
+mesma evidência: quatro cantos com posição física conhecida. E sofre do mesmo
+problema: um objeto pequeno ancora a escala num ponto e extrapola sobre os pés; vários
+objetos espalhados pela área de apoio devolvem a interpolação.
+
+A diferença é que a **pose** de cada objeto solto é desconhecida, e por isso entra como
+incógnita de um ajuste conjunto (`fit.py::fit_free_rectangles`). Detalhes, tolerâncias
+das normas e números medidos em **`CALIBRATION_WITHOUT_PRINTING.md`**.
+
+## 8. Lição que vale para o resto do projeto
 
 Uma verificação que só olha para o próprio ponto de referência não verifica nada. A
 verificação de escala original era tecnicamente correta e praticamente inútil, porque

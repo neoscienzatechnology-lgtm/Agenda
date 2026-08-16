@@ -251,6 +251,12 @@ def verify_round_trip(rectification: Rectification, target=None
     from .marker import detect_marker  # import local evita ciclo
 
     settings = get_settings()
+
+    if target is not None and getattr(target, "kind", "aruco") == "reference":
+        from .reference import verify_reference_round_trip
+
+        return verify_reference_round_trip(rectification, target)
+
     det = detect_marker(rectification.image)
     if not det.found:
         return [], float("inf")

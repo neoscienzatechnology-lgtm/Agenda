@@ -64,8 +64,19 @@ export function ResultScreen({
         <span className="pill success">Pedigrafia concluída</span>
         <h2>Medidas aprovadas</h2>
         <p className="muted">
-          Valores obtidos por calibração geométrica do marcador de 50 × 50 mm.
+          Valores obtidos por calibração geométrica de{' '}
+          {analysis.calibration?.reference
+            ? `${analysis.calibration.reference.label} (${analysis.calibration.reference.widthMm} × ${analysis.calibration.reference.heightMm} mm, ${analysis.calibration.reference.standard})`
+            : 'marcador de 50 × 50 mm'}
+          .
         </p>
+        {analysis.calibration && analysis.calibration.scaleToleranceMm >= 1 && (
+          <p className="note small">
+            A tolerância do próprio padrão físico impõe ±
+            {analysis.calibration.scaleToleranceMm.toFixed(1)} mm a estas medidas —
+            é o piso de erro desta captura, e nenhum processamento o remove.
+          </p>
+        )}
       </header>
 
       <div className="result-grid">

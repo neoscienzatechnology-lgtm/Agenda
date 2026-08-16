@@ -44,7 +44,14 @@ export default function App() {
   }, [analysis])
 
   const runAnalysis = useCallback(
-    async (file: File | Blob, opts: { shoeSize?: string; view?: 'below' | 'above' }) => {
+    async (
+      file: File | Blob,
+      opts: {
+        shoeSize?: string
+        view?: 'below' | 'above'
+        calibration?: api.CalibrationSource
+      },
+    ) => {
       setBusy(true)
       setError(null)
       setStage('analyzing')
@@ -52,6 +59,7 @@ export default function App() {
         const res = await api.analyze(file, {
           view: opts.view ?? 'below',
           shoeSize: opts.shoeSize,
+          calibration: opts.calibration ?? 'auto',
         })
         setAnalysis(res)
         setRejection(null)
@@ -114,7 +122,7 @@ export default function App() {
             <div className="spinner" aria-hidden="true" />
             <h2>Analisando a captura</h2>
             <p className="muted">
-              Detectando o marcador de 50 × 50 mm, corrigindo a perspectiva e medindo em
+              Localizando a referência de escala, corrigindo a perspectiva e medindo em
               milímetros.
             </p>
           </div>

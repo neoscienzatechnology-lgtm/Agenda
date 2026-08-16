@@ -22,6 +22,7 @@ Cada alvo é apenas uma tabela de "marcador de id N tem o canto superior esquerd
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,18 +33,41 @@ from ..config import get_settings
 
 @dataclass(frozen=True)
 class MarkerPlacement:
-    """Posição física de um marcador no plano da plataforma."""
+    """Posição física de um marcador (ou retângulo de referência) na plataforma."""
 
     marker_id: int
     origin_mm: tuple[float, float]
     size_mm: float
+    """Largura física em mm. Para um marcador ArUco é a aresta do quadrado."""
+    height_mm: float | None = None
+    """Altura física, quando o alvo não é quadrado (cartão, folha). ``None`` = quadrado."""
+    rotation_deg: float = 0.0
+    """Rotação do retângulo no plano, em torno de ``origin_mm``.
+
+    Só é diferente de zero para objetos de referência soltos, cuja pose é resolvida
+    pelo ajuste conjunto — um alvo impresso tem os marcadores alinhados por
+    construção."""
+
+    @property
+    def size_y_mm(self) -> float:
+        return self.size_mm if self.height_mm is None else self.height_mm
 
     def corners_mm(self) -> np.ndarray:
         """Cantos TL, TR, BR, BL — mesma ordem que o detector do OpenCV devolve."""
+        return self.padded_corners_mm(0.0)
+
+    def padded_corners_mm(self, pad_mm: float) -> np.ndarray:
+        """Cantos com uma folga uniforme de ``pad_mm`` para fora (zona de silêncio)."""
         x, y = self.origin_mm
-        s = self.size_mm
-        return np.array([[x, y], [x + s, y], [x + s, y + s], [x, y + s]],
-                        dtype=np.float64)
+        w, h = self.size_mm, self.size_y_mm
+        p = float(pad_mm)
+        local = np.array([[-p, -p], [w + p, -p], [w + p, h + p], [-p, h + p]],
+                         dtype=np.float64)
+        if self.rotation_deg:
+            a = math.radians(self.rotation_deg)
+            R = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+            local = local @ R.T
+        return local + np.array([x, y], dtype=np.float64)
 
 
 @dataclass(frozen=True)
@@ -52,6 +76,14 @@ class CalibrationTarget:
     dictionary: str
     markers: tuple[MarkerPlacement, ...] = field(default_factory=tuple)
     description: str = ""
+    kind: str = "aruco"
+    """``aruco`` (marcadores codificados) ou ``reference`` (retângulo de dimensão
+    normalizada). Decide como a escala é re-verificada na imagem retificada."""
+    reference: object = None
+    """``calibration.reference.ReferenceObject`` quando ``kind == "reference"``.
+
+    Tipado como ``object`` de propósito: este módulo não depende do detector de
+    retângulos, apenas o contrário."""
 
     @property
     def ids(self) -> set[int]:
@@ -78,6 +110,26 @@ class CalibrationTarget:
             return (0.0, 0.0)
         lo, hi = pts.min(axis=0), pts.max(axis=0)
         return (float(hi[0] - lo[0]), float(hi[1] - lo[1]))
+
+    def scale_tolerance_rel(self) -> float:
+        """Incerteza relativa de escala herdada do próprio padrão físico.
+
+        É um erro que **não** aparece em nenhum teste de imagem e que nenhum
+        algoritmo remove: se o objeto de referência não tem a dimensão declarada,
+        tudo sai proporcionalmente errado. Para um objeto normalizado vem da norma;
+        para um alvo impresso, da fidelidade da impressão (que o profissional deve
+        conferir com régua — ver ``docs/VALIDATION_CHECKLIST.md``).
+
+        Não inclui o erro de **posicionamento** dos marcadores colados na
+        plataforma; para isso, meça as posições reais e use um alvo JSON.
+        """
+        ref = self.reference
+        if ref is not None:
+            return float(getattr(ref, "scale_tolerance_rel", 0.0))
+        settings = get_settings()
+        smallest = min((m.size_mm for m in self.markers),
+                       default=settings.marker_size_mm)
+        return float(settings.printed_target_tolerance_mm / max(smallest, 1e-6))
 
 
 def single_marker_target(size_mm: float | None = None,

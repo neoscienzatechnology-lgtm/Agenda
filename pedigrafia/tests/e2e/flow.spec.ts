@@ -34,8 +34,15 @@ test('fluxo completo: captura → revisão → aprovação → PDF 1:1', async (
   await expect(page.getByRole('heading', { level: 1 })).toContainText('escala 1:1')
   await page.getByRole('button', { name: 'Nova pedigrafia' }).click()
 
-  // 2 — captura
+  // 2 — captura. A origem da escala é declarada aqui, e o padrão é o alvo impresso:
+  // a cena de teste tem marcador ArUco, e um padrão diferente mudaria a metrologia
+  // sem que o teste percebesse.
   await expect(page.getByRole('button', { name: 'Selecionar foto' })).toBeVisible()
+  await expect(page.getByRole('radio', { name: /Alvo impresso/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
+  await expect(page.getByRole('radio', { name: /Cartão/ })).toBeVisible()
   await page.locator('input[type=file]').nth(1).setInputFiles(SCENE)
   await page.getByRole('button', { name: 'Analisar captura' }).click()
 

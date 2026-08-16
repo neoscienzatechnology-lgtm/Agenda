@@ -60,6 +60,7 @@ pedigrafia/
 | [`docs/COORDINATE_SYSTEM.md`](docs/COORDINATE_SYSTEM.md) | Os cinco frames e as conversões exatas |
 | [`docs/RUNNING.md`](docs/RUNNING.md) | Rodar, testar, configurar e implantar |
 | [`docs/METROLOGY_CALIBRATION.md`](docs/METROLOGY_CALIBRATION.md) | Por que um marcador só não basta — diagnóstico medido |
+| [`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md) | Calibrar com cartão ou folha A4, e quanto se perde |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Exatidão medida e limitações conhecidas |
 | [`docs/VALIDATION_CHECKLIST.md`](docs/VALIDATION_CHECKLIST.md) | Validação com régua e impressão reais |
 | [`docs/TRAINING.md`](docs/TRAINING.md) | Treinar um modelo específico de segmentação |
@@ -82,10 +83,23 @@ coordenadas indicadas em cada folha, ao redor da área de apoio.
 > **extrapolada** para longe dele — o erro sobe de 0,14 mm para 1,3 mm. O sistema avisa
 > quando está nessa condição.
 
+### Sem impressora
+
+Um objeto de dimensão normalizada serve de referência: **cartão** de 85,60 × 53,98 mm
+(ISO/IEC 7810 ID-1) ou **folha A4**. Basta declarar qual foi usado na captura.
+
+O custo é medido e reportado, não escondido: o cartão é pequeno, então a escala volta a
+ser extrapolada (quatro cartões ao redor dos pés resolvem, pela mesma geometria do alvo
+impresso); e a folha A4 carrega ±2 mm de tolerância de corte, ou seja ±2,5 mm em um pé
+de 265 mm, que nenhum algoritmo remove. **Moeda e régua foram recusadas** — o porquê,
+com a aritmética, está em
+[`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md).
+
 ## Princípios que o código impõe
 
-1. **A escala vem dos marcadores.** Nenhum outro caminho define dimensão física — e o
-   sistema informa se está interpolando entre marcadores ou extrapolando a partir de um.
+1. **A escala vem de uma referência física de dimensão conhecida** — marcador impresso
+   ou objeto normalizado. Nenhum outro caminho define dimensão física, e o sistema
+   informa se está interpolando entre pontos de controle ou extrapolando a partir de um.
 2. **Geometria em milímetros, sempre.** Pixels existem só para rasterizar; a única
    conversão px↔mm vive em `calibration/homography.py` e em `geom/units.ts`.
 3. **Posicionamento no PDF é isometria.** `|det(M)| = 1`, verificado em teste; as
@@ -111,6 +125,7 @@ coordenadas indicadas em cada folha, ao redor da área de apoio.
 | `POST /api/render-annotated` | PNG anotado (análise visual) |
 | `GET /api/marker.pdf?target=board4` | Alvo de calibração de 4 marcadores (recomendado) |
 | `GET /api/marker.pdf` | Marcador único de 50 × 50 mm |
+| `GET /api/references` | Objetos aceitos como referência sem impressão — e os recusados |
 | `POST /api/verify-pdf` | QA: relê um PDF e confere a dimensão física |
 | `DELETE /api/session/{id}` | Apaga a sessão temporária |
 

@@ -34,11 +34,17 @@
    │  ① normalização EXIF (rotação apenas — sem reescala)
    ▼
  imagem normalizada (px)
-   │  ② detecção ArUco/AprilTag + refino subpixel (cornerSubPix)
+   │  ② detecção da referência física, por um de dois caminhos:
+   │      • ArUco/AprilTag + refino subpixel (cornerSubPix)          — mais exato
+   │      • retângulo normalizado (cartão ISO 7810, folha A4):
+   │        ajuste de retas nas arestas + interseção                 — sem impressora
    ▼
- 4 cantos do marcador (px, subpixel)
+ 4 cantos por objeto (px, subpixel)
    │  ③ correspondência com o modelo físico conhecido:
-   │       (0,0) (50,0) (50,50) (0,50)  [mm]
+   │       marcador:  (0,0) (50,0) (50,50) (0,50)          [mm]
+   │       cartão:    (0,0) (85.6,0) (85.6,53.98) (0,53.98) [mm]
+   │     com 2+ objetos soltos, a pose de cada um entra como incógnita
+   │     do ajuste conjunto (fit_free_rectangles)
    ▼
  H_img→mm  (homografia 3×3, exata para os 4 pontos)
    │  ④ retificação: amostragem do plano em RECTIFIED_PX_PER_MM px/mm
@@ -72,6 +78,9 @@
 | I8 | Medidas do TypeScript == medidas do Python (paridade) | `tests/fixtures/measurement_parity.json` + pytest + vitest |
 | I9 | Nenhum PDF é emitido sem `reviewApproved` | `test_api.py::test_export_requires_review` |
 | I10 | Número do calçado não altera nenhuma dimensão | `test_shoe_size_is_advisory.py` |
+| I11 | A referência normalizada re-medida na imagem retificada confere lados **e** diagonais | `test_reference_object.py::test_round_trip_re_measures_the_object_on_the_rectified_image` |
+| I12 | O modo automático recusa identificar a referência quando a forma não prova qual é | `test_reference_object.py::test_auto_mode_refuses_instead_of_guessing_the_object` |
+| I13 | Pedir alvo impresso nunca cai, em silêncio, numa escala de outra origem | `test_reference_object.py::test_aruco_mode_never_falls_back_to_a_reference` |
 
 ## 3. Sistemas de coordenadas
 
@@ -80,7 +89,7 @@ Ver `COORDINATE_SYSTEM.md` para a definição formal. Resumo:
 | Frame | Unidade | Origem | Uso |
 |---|---|---|---|
 | `image` | px | canto sup. esq. da foto normalizada | somente entrada |
-| `plane` | **mm** | canto sup. esq. do marcador | **frame canônico de troca** |
+| `plane` | **mm** | canto sup. esq. da referência (marcador ou objeto) | **frame canônico de troca** |
 | `rect` | px | canto sup. esq. do raster retificado | somente rasterização |
 | `foot` | mm | ponto mais posterior do calcâneo, eixo *u* → dedos | relatório de landmarks |
 | `page` | mm → pt | canto inf. esq. da folha A4 | somente PDF |
@@ -96,7 +105,9 @@ app/
   schemas.py         Contratos Pydantic (espelhados em frontend/src/types)
   security.py        Validação de upload, sniffing MIME, nomes aleatórios
   storage.py         Sessão temporária em disco + reaper TTL
-  calibration/       marker.py (ArUco/AprilTag), homography.py (H, retificação, px/mm)
+  calibration/       marker.py (ArUco/AprilTag), reference.py (retângulo normalizado),
+                     target.py (posições físicas), fit.py (homografia por mínimos
+                     quadrados), homography.py (retificação, px/mm)
   quality/           metrics.py (foco, blur, exposição, glare…), gate.py (score 0–100)
   segmentation/      base.py (interface), classical.py, onnx_model.py, factory.py
   geometry/          contour.py, frame.py, separation.py, laterality.py,
@@ -139,7 +150,7 @@ class Segmenter(Protocol):
   metadados do PDF e a rigidez é verificada por teste.
 * Se o pé não couber em A4 a 1:1, o sistema **não reescala**: marca `fitsOnPage=false`,
   emite aviso e mantém 1:1.
-* Sem régua/quadrado de calibração na folha final (a escala vem do marcador físico).
+* Sem régua/quadrado de calibração na folha final (a escala vem da referência física).
 * `pdf/inspect.py` relê o PDF gerado, decodifica o content stream, aplica o CTM e
   devolve os paths em mm — usado nos testes e no endpoint de QA `/api/verify-pdf`.
 
