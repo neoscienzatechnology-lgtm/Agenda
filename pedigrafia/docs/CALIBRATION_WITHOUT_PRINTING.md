@@ -214,6 +214,12 @@ casco convexo, que é a medida estacionária. Pés emparelhados com a verdade po
 | **Cartão × 4** | −0,678 mm | 0,067 mm | 0,750 mm | 29 mm | 8/16 |
 | **Folha A4 × 1** | −0,226 mm | 0,045 mm | **0,296 mm** | 266 mm | 16/16 |
 
+**Duas folhas A4 não foram medidas.** Com duas folhas a plataforma sintética passa de
+1000 × 1400 mm e, na resolução do gerador (8 px/mm), o raster do plano sozinho supera
+280 MB — a execução foi encerrada por falta de memória. É limite do arcabouço de
+teste, não do sistema; a configuração recomendada é **uma** folha medida com
+paquímetro, que é a que está na tabela.
+
 ¹ Não é erro de ajuste conjunto: nessa cena **só um** dos dois cartões foi detectado,
 e o sistema caiu para calibração de objeto único com 295 mm de extrapolação. Nas sete
 cenas em que os dois cartões foram realmente encontrados, o erro ficou entre +0,61 e
