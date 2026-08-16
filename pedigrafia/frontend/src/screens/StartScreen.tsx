@@ -1,4 +1,4 @@
-import { markerPdfUrl } from '../api/client'
+import { markerPdfUrl, targetPdfUrl } from '../api/client'
 
 export function StartScreen({ onStart }: { onStart: () => void }) {
   return (
@@ -18,9 +18,17 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
           Nova pedigrafia
         </button>
 
-        <a className="ghost link" href={markerPdfUrl()} target="_blank" rel="noreferrer">
-          Baixar marcador de calibração (imprimir em 100%)
+        <a className="secondary link" href={targetPdfUrl()} target="_blank" rel="noreferrer">
+          Baixar alvo de calibração — 4 marcadores (recomendado)
         </a>
+        <a className="ghost link" href={markerPdfUrl()} target="_blank" rel="noreferrer">
+          Marcador único (menos exato longe do marcador)
+        </a>
+        <p className="note small">
+          Com quatro marcadores ao redor da área de apoio a escala é interpolada entre
+          eles. Com um marcador só, ela é extrapolada, e o erro cresce com a distância
+          até o marcador — medido em até 2 mm.
+        </p>
       </div>
 
       <ol className="start-steps">

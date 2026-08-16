@@ -22,6 +22,24 @@ CORNER_ORDER = ("TL", "TR", "BR", "BL")
 
 
 @dataclass
+class DetectedMarker:
+    """Um marcador individual localizado na foto."""
+
+    marker_id: int
+    corners_px: np.ndarray            # (4, 2) float64, ordem TL TR BR BL
+    side_lengths_px: tuple
+    touches_border: bool
+
+    @property
+    def center_px(self) -> np.ndarray:
+        return self.corners_px.mean(axis=0)
+
+    @property
+    def mean_side_px(self) -> float:
+        return float(np.mean(self.side_lengths_px))
+
+
+@dataclass
 class MarkerDetection:
     found: bool
     corners_px: np.ndarray            # (4, 2) float64, ordem TL TR BR BL
@@ -35,6 +53,15 @@ class MarkerDetection:
     confidence: float = 0.0
     touches_border: bool = False
     reason: str = ""
+    markers: tuple = ()
+    """Todos os marcadores detectados (``DetectedMarker``), não só o escolhido.
+
+    É a partir desta lista que a calibração multi-marcador monta os pontos de
+    controle distribuídos pela plataforma."""
+
+    @property
+    def detected_ids(self) -> list[int]:
+        return [m.marker_id for m in self.markers]
 
     @property
     def center_px(self) -> np.ndarray:
@@ -128,6 +155,15 @@ def estimate_tilt_deg(corners_px: np.ndarray, image_shape: tuple[int, int],
     return float(tilt)
 
 
+def _touches_frame(quad: np.ndarray, width: int, height: int,
+                   margin: float = 2.0) -> bool:
+    return bool(
+        np.any(quad[:, 0] < margin) or np.any(quad[:, 1] < margin)
+        or np.any(quad[:, 0] > width - 1 - margin)
+        or np.any(quad[:, 1] > height - 1 - margin)
+    )
+
+
 def _refine_corners(gray: np.ndarray, corners: np.ndarray) -> np.ndarray:
     side = float(np.linalg.norm(corners[1] - corners[0]))
     win = int(max(3, min(11, round(side / 12.0))))
@@ -171,26 +207,31 @@ def detect_marker(bgr: np.ndarray, *, dictionary: Optional[str] = None,
                 reason=f"Marcador id={wanted_id} não encontrado (vistos: {ids_flat}).",
             )
 
-    # Havendo vários, escolhe o de maior área (o mais próximo/confiável).
+    # Havendo vários, escolhe o de maior área (o mais próximo/confiável) como
+    # referência principal; TODOS entram em `markers` para a calibração distribuída.
     def area(entry):
         pts = entry[1].reshape(4, 2)
         return abs(cv2.contourArea(pts.astype(np.float32)))
 
+    h_img, w_img = bgr.shape[:2]
+    all_markers: list[DetectedMarker] = []
+    for mid, raw in candidates:
+        q = _refine_corners(gray, raw.reshape(4, 2).astype(np.float64))
+        sides_i, _, _ = _quad_metrics(q)
+        all_markers.append(DetectedMarker(
+            marker_id=int(mid), corners_px=q, side_lengths_px=sides_i,
+            touches_border=_touches_frame(q, w_img, h_img),
+        ))
+
     chosen_id, chosen = max(candidates, key=area)
-    quad = chosen.reshape(4, 2).astype(np.float64)
-    quad = _refine_corners(gray, quad)
+    quad = _refine_corners(gray, chosen.reshape(4, 2).astype(np.float64))
 
     sides, skew, angle_dev = _quad_metrics(quad)
     mean_side = sum(sides) / 4.0
     src_px_per_mm = mean_side / settings.marker_size_mm
     tilt = estimate_tilt_deg(quad, bgr.shape[:2], settings.marker_size_mm)
 
-    h, w = bgr.shape[:2]
-    margin = 2.0
-    touches = bool(
-        np.any(quad[:, 0] < margin) or np.any(quad[:, 1] < margin)
-        or np.any(quad[:, 0] > w - 1 - margin) or np.any(quad[:, 1] > h - 1 - margin)
-    )
+    touches = _touches_frame(quad, bgr.shape[1], bgr.shape[0])
 
     # Confiança combinando amostragem, regularidade do quadrilátero e recorte.
     res_term = float(np.clip(src_px_per_mm / 4.0, 0.0, 1.0))
@@ -212,6 +253,7 @@ def detect_marker(bgr: np.ndarray, *, dictionary: Optional[str] = None,
         tilt_deg=tilt,
         confidence=float(np.clip(conf, 0.0, 1.0)),
         touches_border=touches,
+        markers=tuple(all_markers),
     )
 
 

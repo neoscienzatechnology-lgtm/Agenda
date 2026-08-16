@@ -1,7 +1,36 @@
-# Próximos passos: treinar um modelo específico de segmentação plantar
+# Treinar um modelo específico de segmentação plantar
 
-O MVP funciona ponta a ponta com segmentação clássica (OpenCV). Nada no pipeline
+O sistema funciona ponta a ponta com segmentação clássica (OpenCV). Nada no pipeline
 precisa mudar para trocar por um modelo treinado — a interface já está isolada.
+
+> **Antes de treinar, leia isto.** A maior fonte de erro do sistema **não era** a
+> segmentação: era a extrapolação da homografia a partir de um marcador único
+> (`METROLOGY_CALIBRATION.md`). Corrigido isso com o alvo de quatro marcadores, o erro
+> de comprimento caiu para **−0,064 mm em média, 0,137 mm no pior caso** em 10 pés
+> sintéticos com inclinação até 24°, rolagem ±15° e distância de 520 a 1050 mm.
+>
+> Ou seja: **em cena sintética não sobra erro para um modelo corrigir.** O valor de
+> treinar um modelo está inteiramente na robustez em **foto real** — pele, sombra,
+> meia, esmalte, pelo, patologia, podoscópio sujo — que o gerador não representa.
+> Treinar contra dados sintéticos e comemorar a métrica seria enganar a si mesmo.
+
+## 0. Ferramentas já prontas
+
+```bash
+pip install -e ./ml-or-vision[train]
+
+# 1. conjunto sintético (máscaras exatas, com anti-aliasing na borda)
+python -m pedigrafia_vision.dataset            # via generate_synthetic_dataset()
+
+# 2. treino (U-Net, perda com peso extra na borda, rótulos suaves)
+python -m pedigrafia_vision.train --data ./dataset --epochs 40 --out modelo.pt
+
+# 3. exportação (saída = PROBABILIDADE, não máscara binária)
+python -m pedigrafia_vision.export_onnx --checkpoint modelo.pt --out modelo.onnx
+
+# 4. critério de aceite EM MILÍMETROS, através do pipeline real
+python -m pedigrafia_vision.benchmark --scenes 60 --model modelo.onnx
+```
 
 ## 1. Onde o modelo entra
 

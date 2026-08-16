@@ -26,6 +26,19 @@ export interface MarkerInfo {
   roundTripErrorMm: number
 }
 
+export interface CalibrationInfo {
+  targetName: string
+  markerCount: number
+  usedMarkerIds: number[]
+  residualRmsMm: number
+  residualMaxMm: number
+  exact: boolean
+  coverageSpanMm: number[]
+  extrapolationMm: number
+  interpolated: boolean
+  warnings: string[]
+}
+
 export interface RectificationInfo {
   pxPerMm: number
   originMm: PointMm
@@ -181,6 +194,7 @@ export interface AnalyzeResponse {
   view: ViewPoint
   captureQuality: CaptureQuality
   marker: MarkerInfo
+  calibration: CalibrationInfo | null
   rectification: RectificationInfo | null
   rectifiedImageUrl: string | null
   feet: FootAnalysis[]

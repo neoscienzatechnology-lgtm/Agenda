@@ -222,8 +222,11 @@ def evaluate_capture(decoded: DecodedImage, marker: MarkerDetection) -> QualityR
 def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
                       foot_mask: np.ndarray, search_mask: np.ndarray,
                       components: list, px_per_mm: float,
-                      round_trip_error_mm: float) -> QualityReport:
-    q = get_settings().quality
+                      round_trip_error_mm: float,
+                      extrapolation_mm: float = 0.0,
+                      calibration=None) -> QualityReport:
+    settings = get_settings()
+    q = settings.quality
 
     n = len(components)
     report.add(Check(
@@ -264,13 +267,41 @@ def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
     ))
 
     report.add(Check(
-        id="scale_round_trip", label="Escala verificada (marcador re-medido)",
+        id="scale_round_trip", label="Escala verificada (marcadores re-medidos)",
         passed=round_trip_error_mm <= 0.5,
         score=_ramp(round_trip_error_mm, 0.5, 0.05),
         value=round_trip_error_mm, threshold=0.5,
         severity="blocker", group="marker",
         hint="A verificação de escala falhou; a calibração não é confiável.",
     ))
+
+    # --------------------------------------------------- cobertura da calibração
+    # Dentro do casco dos pontos de controle a homografia interpola; fora dele
+    # extrapola, e o erro cresce com a distância. Este é o preditor direto do viés
+    # medido de até 2 mm com marcador único (ver docs/METROLOGY_CALIBRATION.md).
+    warn = settings.max_extrapolation_warn_mm
+    block = settings.max_extrapolation_block_mm
+    report.add(Check(
+        id="calibration_coverage", label="Pés dentro da área calibrada",
+        passed=extrapolation_mm <= block,
+        score=_ramp(extrapolation_mm, block, 0.0),
+        value=extrapolation_mm, threshold=warn,
+        severity="blocker", group="marker",
+        hint=(f"Os pés estão a {extrapolation_mm:.0f} mm fora da região coberta pelos "
+              f"marcadores: a escala está sendo EXTRAPOLADA e a exatidão cai com a "
+              f"distância. Use um alvo com quatro marcadores ao redor da área de "
+              f"apoio (GET /api/marker.pdf?target=board4)."),
+    ))
+    if calibration is not None and not calibration.exact:
+        report.add(Check(
+            id="calibration_residual", label="Resíduo do ajuste da calibração",
+            passed=calibration.residual_max_mm <= 1.0,
+            score=_ramp(calibration.residual_max_mm, 1.0, 0.05),
+            value=calibration.residual_max_mm, threshold=1.0,
+            severity="blocker", group="marker",
+            hint=("Os marcadores não são consistentes com o alvo declarado. Confira "
+                  "as posições físicas no arquivo do alvo, com paquímetro."),
+        ))
     return report
 
 

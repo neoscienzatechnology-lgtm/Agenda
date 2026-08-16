@@ -12,7 +12,8 @@ from fastapi.responses import JSONResponse, Response
 from .. import schemas as S
 from ..config import get_settings
 from ..image_io import decode_image, encode_png
-from ..pdf.builder import CONTOUR_RGB, build_foot_pdf, build_marker_sheet_pdf
+from ..pdf.builder import (CONTOUR_RGB, build_foot_pdf, build_marker_sheet_pdf,
+                           build_target_sheet_pdf)
 from ..pdf.inspect import inspect_pdf, path_axis_length_mm, path_max_caliper_mm
 from ..pipeline import PipelineBlocked, analyze
 from ..render.annotated import AnnotatedRenderer
@@ -288,16 +289,29 @@ def render_annotated(body: S.RenderAnnotatedRequest) -> Response:
 
 # ------------------------------------------------------------------ ferramentas
 @router.get("/marker.pdf")
-def marker_pdf(markerId: int = 7, dictionary: str = "") -> Response:
+def marker_pdf(markerId: int = 7, dictionary: str = "", target: str = "") -> Response:
+    """Folha de calibração imprimível.
+
+    Sem ``target``: um marcador único (compatibilidade). Com ``target=board4``: o alvo
+    de quatro marcadores, que é o **recomendado** — ele elimina a extrapolação da
+    homografia, que é a maior fonte de erro do sistema.
+    """
     if not (0 <= markerId <= 999):
         raise HTTPException(status_code=400, detail={"code": "bad_marker_id"})
     try:
-        data = build_marker_sheet_pdf(markerId, dictionary or None)
-    except ValueError as exc:
+        if target:
+            from ..calibration.target import resolve_target
+
+            data = build_target_sheet_pdf(resolve_target(target))
+            filename = f"alvo-calibracao-{target}.pdf"
+        else:
+            data = build_marker_sheet_pdf(markerId, dictionary or None)
+            filename = "marcador-50mm.pdf"
+    except (ValueError, OSError, KeyError) as exc:
         raise HTTPException(status_code=400, detail={
-            "code": "bad_dictionary", "message": str(exc)}) from exc
+            "code": "bad_target", "message": str(exc)}) from exc
     return Response(content=data, media_type="application/pdf", headers={
-        "Content-Disposition": 'inline; filename="marcador-50mm.pdf"'})
+        "Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @router.post("/verify-pdf", response_model=S.PdfVerification)

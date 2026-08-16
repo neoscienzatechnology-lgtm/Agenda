@@ -161,6 +161,11 @@ export function markerPdfUrl(markerId = 7): string {
   return `${BASE}/api/marker.pdf?markerId=${markerId}`
 }
 
+/** Alvo de quatro marcadores — o layout recomendado, que evita extrapolação. */
+export function targetPdfUrl(target = 'board4'): string {
+  return `${BASE}/api/marker.pdf?target=${encodeURIComponent(target)}`
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

@@ -70,6 +70,9 @@ Tudo via variáveis de ambiente com prefixo `PEDIGRAFIA_`. As principais:
 | `PEDIGRAFIA_MARKER_SIZE_MM` | `50.0` | Aresta física do marcador |
 | `PEDIGRAFIA_MARKER_DICTIONARY` | `DICT_4X4_50` | ArUco/AprilTag (`DICT_APRILTAG_36H11`, …) |
 | `PEDIGRAFIA_MARKER_ID` | `-1` | `-1` aceita qualquer id do dicionário |
+| `PEDIGRAFIA_TARGET` | `auto` | `auto`, `single`, `board4` ou caminho de um JSON de alvo |
+| `PEDIGRAFIA_MAX_EXTRAPOLATION_WARN_MM` | `60` | Acima disso o score cai |
+| `PEDIGRAFIA_MAX_EXTRAPOLATION_BLOCK_MM` | `450` | Acima disso a captura é recusada |
 | `PEDIGRAFIA_RECTIFIED_PX_PER_MM` | `6.0` | Amostragem do raster retificado |
 | `PEDIGRAFIA_WORKING_AREA_MM` | `700.0` | Janela física máxima retificada |
 | `PEDIGRAFIA_SEGMENTER` | `classical` | `classical` ou `onnx` |

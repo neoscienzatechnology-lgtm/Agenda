@@ -68,6 +68,23 @@ def marker_to_schema(marker: MarkerDetection, round_trip_sides: list[float],
     )
 
 
+def calibration_to_schema(result: PipelineResult) -> S.CalibrationInfo:
+    fit = result.calibration
+    span = fit.coverage_span_mm()
+    return S.CalibrationInfo(
+        targetName=fit.target_name,
+        markerCount=fit.marker_count,
+        usedMarkerIds=list(fit.used_marker_ids),
+        residualRmsMm=round(fit.residual_rms_mm, 4),
+        residualMaxMm=round(fit.residual_max_mm, 4),
+        exact=fit.exact,
+        coverageSpanMm=[round(span[0], 1), round(span[1], 1)],
+        extrapolationMm=round(result.extrapolation_mm, 1),
+        interpolated=result.extrapolation_mm <= 1e-6,
+        warnings=list(fit.warnings),
+    )
+
+
 def rectification_to_schema(rect: Rectification) -> S.RectificationInfo:
     return S.RectificationInfo(
         pxPerMm=round(rect.px_per_mm, 6),
@@ -230,6 +247,7 @@ def result_to_response(result: PipelineResult, session_id: str, created_at: floa
         captureQuality=quality_to_schema(result.quality),
         marker=marker_to_schema(result.marker, result.round_trip_sides_mm,
                                 result.round_trip_error_mm),
+        calibration=calibration_to_schema(result),
         rectification=rectification_to_schema(result.rectification),
         rectifiedImageUrl=rectified_url,
         feet=feet, footCount=len(feet), shoeSizeCheck=check,

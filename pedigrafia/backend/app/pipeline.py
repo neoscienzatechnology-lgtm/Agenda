@@ -12,9 +12,12 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
+from .calibration.fit import (CalibrationFitError, HomographyFit,
+                              extrapolation_distance_mm, fit_homography)
 from .calibration.homography import (Rectification, build_rectification,
-                                     compute_homography, verify_round_trip)
+                                     verify_round_trip)
 from .calibration.marker import MarkerDetection, detect_marker
+from .calibration.target import CalibrationTarget, select_target_for_detection
 from .callosity.detect import detect_callosities
 from .config import get_settings
 from .geometry import polygon as poly
@@ -71,6 +74,9 @@ class FootResult:
 @dataclass
 class PipelineResult:
     marker: MarkerDetection
+    calibration: HomographyFit
+    target: CalibrationTarget
+    extrapolation_mm: float
     rectification: Rectification
     segmentation: SegmentationResult
     quality: QualityReport
@@ -82,14 +88,18 @@ class PipelineResult:
     view: str = "below"
 
 
-def _marker_exclusion_mask(rect: Rectification, pad_mm: float = 18.0) -> np.ndarray:
-    size = get_settings().marker_size_mm
-    box = np.array([[-pad_mm, -pad_mm],
-                    [size + pad_mm, -pad_mm],
-                    [size + pad_mm, size + pad_mm],
-                    [-pad_mm, size + pad_mm]], dtype=np.float64)
+def _marker_exclusion_mask(rect: Rectification, target: CalibrationTarget,
+                           pad_mm: float = 18.0) -> np.ndarray:
+    """Região onde não se procura pé: cada marcador do alvo mais a zona de silêncio."""
     mask = np.zeros(rect.image.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(mask, [rect.mm_to_rect_px(box).astype(np.int32)], 255)
+    for placement in target.markers:
+        x, y = placement.origin_mm
+        s = placement.size_mm
+        box = np.array([[x - pad_mm, y - pad_mm],
+                        [x + s + pad_mm, y - pad_mm],
+                        [x + s + pad_mm, y + s + pad_mm],
+                        [x - pad_mm, y + s + pad_mm]], dtype=np.float64)
+        cv2.fillPoly(mask, [rect.mm_to_rect_px(box).astype(np.int32)], 255)
     return mask
 
 
@@ -106,8 +116,9 @@ def analyze(decoded: DecodedImage, *, view: str | None = None,
         timings[name] = round((time.perf_counter() - t0) * 1000.0, 2)
         return out
 
-    # Etapa 3 — detectar o marcador de 50 × 50 mm.
+    # Etapa 3 — detectar os marcadores de 50 × 50 mm.
     marker = stage("marker", lambda: detect_marker(decoded.bgr))
+    target = select_target_for_detection(marker.detected_ids)
 
     # Quality gate, parte 1: sem marcador válido o pipeline não continua.
     report = stage("quality_capture", lambda: evaluate_capture(decoded, marker))
@@ -115,21 +126,29 @@ def analyze(decoded: DecodedImage, *, view: str | None = None,
         raise PipelineBlocked(report, marker)
 
     # Etapas 4–6 — homografia, retificação e a escala px → mm.
-    H, _ = compute_homography(marker)
-    rect: Rectification = stage("rectify",
-                                lambda: build_rectification(decoded.bgr, marker, H))
+    # A homografia usa TODOS os cantos de TODOS os marcadores do alvo: com quatro
+    # marcadores a região dos pés fica interpolada, e não extrapolada a partir de um
+    # ponto só (causa medida do viés de 2 mm — ver docs/METROLOGY_CALIBRATION.md).
+    try:
+        fit = stage("calibrate", lambda: fit_homography(marker, target))
+    except CalibrationFitError as exc:
+        raise PipelineBlocked(_calibration_blocked(marker, str(exc)), marker) from exc
+    warnings.extend(fit.warnings)
+
+    rect: Rectification = stage("rectify", lambda: build_rectification(
+        decoded.bgr, marker, fit.homography_image_to_mm, fit.control_points_mm))
     if rect.downscaled:
         warnings.append(
             "Área útil muito grande: a imagem retificada foi reamostrada em "
             f"{rect.px_per_mm:.2f} px/mm. A escala física continua exata."
         )
 
-    sides, rt_error = stage("round_trip", lambda: verify_round_trip(rect))
+    sides, rt_error = stage("round_trip", lambda: verify_round_trip(rect, target))
     if not np.isfinite(rt_error):
         warnings.append("Não foi possível re-detectar o marcador na imagem retificada.")
 
     # Etapa 7 — segmentar a região dos pés.
-    exclude = _marker_exclusion_mask(rect)
+    exclude = _marker_exclusion_mask(rect, target)
     ctx = SegmentationContext(
         px_per_mm=rect.px_per_mm, origin_mm=rect.origin_mm,
         valid_mask=rect.valid_mask, exclude_mask=exclude,
@@ -145,10 +164,17 @@ def analyze(decoded: DecodedImage, *, view: str | None = None,
     components = stage("separate", lambda: split_feet(
         seg.mask, rect, seg.score_field, seg.score_threshold))
 
+    # Quanto a calibração está extrapolando sobre a região realmente medida.
+    if components:
+        measured_pts = np.vstack([c.contour_mm for c in components])
+        extrapolation_mm = extrapolation_distance_mm(fit, measured_pts)
+    else:
+        extrapolation_mm = 0.0
+
     search_mask = cv2.bitwise_and(rect.valid_mask, cv2.bitwise_not(exclude))
     report = stage("quality_geometry", lambda: evaluate_geometry(
         report, rect.image, seg.mask, search_mask, components,
-        rect.px_per_mm, rt_error))
+        rect.px_per_mm, rt_error, extrapolation_mm, fit))
     if not report.passed:
         raise PipelineBlocked(report, marker)
 
@@ -175,10 +201,25 @@ def analyze(decoded: DecodedImage, *, view: str | None = None,
             f.confidence["laterality"] = r.confidence
 
     return PipelineResult(
-        marker=marker, rectification=rect, segmentation=seg, quality=report,
+        marker=marker, calibration=fit, target=target,
+        extrapolation_mm=float(extrapolation_mm),
+        rectification=rect, segmentation=seg, quality=report,
         feet=feet, round_trip_sides_mm=list(sides), round_trip_error_mm=float(rt_error),
         timings_ms=timings, warnings=warnings, view=view,
     )
+
+
+def _calibration_blocked(marker: MarkerDetection, reason: str) -> QualityReport:
+    """Relatório de bloqueio quando a calibração não pode sequer ser montada."""
+    from .quality.gate import Check
+
+    report = QualityReport()
+    report.add(Check(
+        id="calibration_fit", label="Calibração do alvo", passed=False, score=0.0,
+        severity="blocker", group="marker",
+        hint=f"Não foi possível calibrar a partir dos marcadores: {reason}",
+    ))
+    return report
 
 
 def _analyze_foot(comp: FootComponent, rect: Rectification, view: str,
