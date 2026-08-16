@@ -41,7 +41,7 @@ cacheadas** — uma medida servida de cache seria uma medida potencialmente erra
 ```bash
 cd pedigrafia
 
-# Backend — 118 testes (calibração, geometria, PDF, API, segurança, quality gate)
+# Backend — 132 testes (calibração, geometria, PDF, API, segurança, quality gate)
 .venv/bin/python -m pytest tests/backend -q
 
 # Paridade das medidas em TypeScript — 10 testes

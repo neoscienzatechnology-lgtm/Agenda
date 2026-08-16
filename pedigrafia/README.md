@@ -22,7 +22,7 @@ de **50,00 × 50,00 mm**.
 | Comprimento fim a fim — alvo de 4 marcadores | **−0,064 mm média, 0,137 mm pior caso** (inclinação até 24°) |
 | Comprimento fim a fim — marcador único | −0,14 mm média, 1,30 mm pior caso |
 | PDF A4 1:1 relido do arquivo | erro 0,0000 mm em 200/240/260/265/270 mm |
-| Testes | 118 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
+| Testes | 132 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
 | Validação com hardware/pés reais | **não realizada** — ver `docs/VALIDATION_CHECKLIST.md` |
 
 **Este sistema não tem precisão clínica nem metrológica validada.** Os números acima
@@ -36,7 +36,7 @@ pedigrafia/
 ├── frontend/         PWA React + TypeScript + Vite (editor vetorial em canvas)
 ├── backend/          API FastAPI + pipeline de visão (OpenCV/NumPy/scikit-image)
 │   └── app/
-│       ├── calibration/   marcador ArUco/AprilTag, homografia, escala px→mm
+│       ├── calibration/   alvo multi-marcador, homografia por mínimos quadrados, px→mm
 │       ├── quality/       métricas objetivas e quality gate 0–100
 │       ├── segmentation/  interface plugável + clássico + ponte ONNX
 │       ├── geometry/      polígonos em mm, frame do pé, contorno sub-pixel
@@ -47,7 +47,7 @@ pedigrafia/
 │       ├── pdf/           construtor A4 1:1 + inspetor de content stream
 │       ├── synth/         gerador de cenas com verdade geométrica conhecida
 │       └── api/           rotas
-├── ml-or-vision/     adaptadores de modelos (ONNX) e guia de treino
+├── ml-or-vision/     dataset sintético, treino U-Net, exportação ONNX, benchmark em mm
 ├── tests/            pytest, fixture de paridade, end-to-end Playwright
 └── docs/             arquitetura, metrologia, limitações, validação física
 ```
@@ -109,13 +109,14 @@ coordenadas indicadas em cada folha, ao redor da área de apoio.
 | `POST /api/review/approve` | Emite o `reviewToken` (revisão obrigatória) |
 | `POST /api/export-pdf` | PDF A4 1:1, um pé por folha |
 | `POST /api/render-annotated` | PNG anotado (análise visual) |
-| `GET /api/marker.pdf` | Folha de calibração 50 × 50 mm |
+| `GET /api/marker.pdf?target=board4` | Alvo de calibração de 4 marcadores (recomendado) |
+| `GET /api/marker.pdf` | Marcador único de 50 × 50 mm |
 | `POST /api/verify-pdf` | QA: relê um PDF e confere a dimensão física |
 | `DELETE /api/session/{id}` | Apaga a sessão temporária |
 
 Documentação interativa em `/docs`.
 
-## Fora do escopo deste MVP
+## Fora do escopo desta versão
 
 Login, cadastro de pacientes, prontuário, histórico, agenda, pagamentos,
 multiempresa, faturamento, estoque e CRM — deliberadamente não implementados.
