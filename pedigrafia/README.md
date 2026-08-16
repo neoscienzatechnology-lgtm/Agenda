@@ -26,7 +26,7 @@ ou um objeto normalizado (cartão ISO/IEC 7810, folha A4).
 | Comprimento fim a fim — sem impressora: cartão | +0,13 mm média, 1,14 mm pior caso |
 | Incerteza herdada do padrão físico (não removível) | cartão ±0,64 mm · folha A4 ±2,52 mm, em um pé de 265 mm |
 | PDF A4 1:1 relido do arquivo | erro 0,0000 mm em 200/240/260/265/270 mm |
-| Testes | 132 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
+| Testes | 161 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
 | Validação com hardware/pés reais | **não realizada** — ver `docs/VALIDATION_CHECKLIST.md` |
 
 **Este sistema não tem precisão clínica nem metrológica validada.** Os números acima
