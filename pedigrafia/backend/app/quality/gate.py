@@ -293,7 +293,7 @@ def evaluate_geometry(report: QualityReport, rect_bgr: np.ndarray,
     block = settings.max_extrapolation_block_mm
     from_reference = getattr(calibration, "target_name", "") == "reference"
     remedy = ("Espalhe mais objetos iguais ao redor da área de apoio: com quatro, "
-              "a calibração volta a interpolar em vez de extrapolar."
+              "a cobertura fica equivalente à do alvo impresso."
               if from_reference else
               "Use um alvo com quatro marcadores ao redor da área de apoio "
               "(GET /api/marker.pdf?target=board4).")

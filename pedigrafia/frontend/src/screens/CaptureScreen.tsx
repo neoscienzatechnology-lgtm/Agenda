@@ -30,7 +30,7 @@ const SOURCES: {
     label: 'Cartão',
     detail: '85,60 × 53,98 mm',
     hint:
-      'Sem imprimir nada. Dimensão bem controlada (ISO/IEC 7810 ID-1, ±0,13 mm ≈ ±0,4 mm em um pé de 265 mm), mas objeto pequeno: espalhe quatro ao redor da área de apoio para a escala não ser extrapolada.',
+      'Sem imprimir nada. Dimensão bem controlada (ISO/IEC 7810 ID-1, ±0,13 mm ≈ ±0,4 mm em um pé de 265 mm), mas objeto pequeno: espalhe quatro ao redor da área de apoio para a cobertura ficar equivalente à do alvo impresso.',
   },
   {
     key: 'a4',

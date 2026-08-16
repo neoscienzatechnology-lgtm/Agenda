@@ -385,7 +385,7 @@ export function ReviewScreen({
                     A escala está sendo extrapolada a partir de uma única referência: a
                     exatidão cai com a distância até ela.{' '}
                     {analysis.calibration.source === 'reference'
-                      ? 'Espalhe mais objetos iguais ao redor da área de apoio — com quatro a escala volta a ser interpolada.'
+                      ? 'Espalhe mais objetos iguais ao redor da área de apoio — com quatro a cobertura fica equivalente à do alvo impresso.'
                       : 'Para medidas de fabricação, use o alvo de quatro marcadores ao redor da área de apoio.'}
                   </p>
                 )}

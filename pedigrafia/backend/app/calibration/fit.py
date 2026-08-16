@@ -140,10 +140,10 @@ def fit_free_rectangles(detection: MarkerDetection, model_mm: np.ndarray
 
     Com **dois ou mais** vale a pena resolver junto: as incógnitas passam a ser a
     homografia (8) mais a pose no plano de cada objeto extra (3 cada), contra 8
-    resíduos por objeto — sobra informação. O segundo objeto, colocado do outro lado
-    dos pés, estende o casco dos pontos de controle e transforma extrapolação em
-    interpolação, que é exatamente a correção que o alvo de quatro marcadores faz
-    sem exigir impressão.
+    resíduos por objeto — sobra informação. Cada objeto extra estende o casco dos
+    pontos de controle e encolhe a região extrapolada; quatro, ao redor da área de
+    apoio, levam a cobertura ao mesmo patamar do alvo impresso, sem impressora.
+    Dois só cobrem uma faixa: geometria importa mais que quantidade.
 
     O referencial em mm é o do primeiro objeto (origem no seu canto TL), o que fixa
     a liberdade global de similaridade.
@@ -173,8 +173,9 @@ def fit_free_rectangles(detection: MarkerDetection, model_mm: np.ndarray
         warnings.append(
             "Calibração com um único objeto de referência: a escala é exata sobre "
             "ele e extrapolada para o resto da plataforma. Objetos iguais adicionais "
-            "reduzem a extrapolação; com quatro, ao redor da área de apoio, ela "
-            "desaparece — dois apenas cobrem uma faixa, não uma área.")
+            "reduzem a extrapolação; com quatro, ao redor da área de apoio, ela cai "
+            "ao patamar do alvo impresso — dois apenas cobrem uma faixa, não uma "
+            "área.")
     else:
         H, poses = _solve_joint(quads, model, H0, poses)
         exact = False

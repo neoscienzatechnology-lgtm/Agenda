@@ -165,8 +165,12 @@ cena.
 
 **Geometria importa mais que quantidade.** Dois cartões pequenos cobrem uma *faixa*;
 o casco convexo dos pontos de controle é quase uma reta, e os pés continuam a alguma
-distância dele. Quatro, nos cantos da área de apoio, cobrem uma *área* — e aí os pés
-ficam interpolados, exatamente como no alvo impresso.
+distância dele. Quatro, nos cantos da área de apoio, cobrem uma *área*.
+
+O alvo não é extrapolação zero — nem o tabuleiro impresso chega lá, porque os
+pododáctilos e o calcâneo passam um pouco além dos marcadores. O que quatro cartões
+fazem é levar a extrapolação ao **mesmo patamar do alvo impresso**, partindo de
+~290 mm com um cartão só.
 
 ---
 

@@ -29,7 +29,7 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
           <strong>Sem impressora?</strong> Um cartão de 85,60 × 53,98 mm (ISO/IEC 7810)
           ou uma folha A4 servem de referência. É menos exato: o cartão é pequeno, então
           a escala volta a ser extrapolada — quatro cartões ao redor da área de apoio
-          resolvem isso. E a folha A4 traz a tolerância de corte do papel, ±2 mm, que
+          trazem a cobertura ao nível do alvo impresso. E a folha A4 traz a tolerância de corte do papel, ±2 mm, que
           nenhum algoritmo remove.
         </p>
         <p className="note small">
