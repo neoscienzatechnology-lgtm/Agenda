@@ -68,6 +68,41 @@ def marker_to_schema(marker: MarkerDetection, round_trip_sides: list[float],
     )
 
 
+def reference_to_schema(ref) -> S.ReferenceObjectInfo:
+    return S.ReferenceObjectInfo(
+        key=ref.key, label=ref.label,
+        widthMm=ref.width_mm, heightMm=ref.height_mm,
+        toleranceMm=ref.tolerance_mm, standard=ref.standard, note=ref.note,
+        scaleToleranceRel=round(ref.scale_tolerance_rel, 6),
+    )
+
+
+def calibration_to_schema(result: PipelineResult) -> S.CalibrationInfo:
+    fit = result.calibration
+    span = fit.coverage_span_mm()
+    target = result.target
+    tolerance_rel = target.scale_tolerance_rel()
+    longest = max((f.measurements.length_mm for f in result.feet), default=0.0)
+    return S.CalibrationInfo(
+        targetName=fit.target_name,
+        markerCount=fit.marker_count,
+        usedMarkerIds=list(fit.used_marker_ids),
+        residualRmsMm=round(fit.residual_rms_mm, 4),
+        residualMaxMm=round(fit.residual_max_mm, 4),
+        exact=fit.exact,
+        coverageSpanMm=[round(span[0], 1), round(span[1], 1)],
+        extrapolationMm=round(result.extrapolation_mm, 1),
+        interpolated=result.extrapolation_mm <= 1e-6,
+        source=result.marker.source,
+        reference=(reference_to_schema(target.reference)
+                   if target.reference is not None else None),
+        scaleToleranceRel=round(tolerance_rel, 6),
+        scaleToleranceMm=round(longest * tolerance_rel, 2),
+        controlPointsMm=pts(fit.control_points_mm),
+        warnings=list(fit.warnings),
+    )
+
+
 def rectification_to_schema(rect: Rectification) -> S.RectificationInfo:
     return S.RectificationInfo(
         pxPerMm=round(rect.px_per_mm, 6),
@@ -230,6 +265,7 @@ def result_to_response(result: PipelineResult, session_id: str, created_at: floa
         captureQuality=quality_to_schema(result.quality),
         marker=marker_to_schema(result.marker, result.round_trip_sides_mm,
                                 result.round_trip_error_mm),
+        calibration=calibration_to_schema(result),
         rectification=rectification_to_schema(result.rectification),
         rectifiedImageUrl=rectified_url,
         feet=feet, footCount=len(feet), shoeSizeCheck=check,

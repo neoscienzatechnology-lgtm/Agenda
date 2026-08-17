@@ -47,11 +47,18 @@ async function parseError(res: Response): Promise<never> {
   )
 }
 
+/** De onde vem a escala física. `aruco` = alvo impresso; o resto são objetos de
+ *  dimensão normalizada. Declarar é obrigatório na prática: a razão largura/altura
+ *  de um cartão e a de uma folha A4 ficam a ~11 % uma da outra, e trocá-las erraria
+ *  a escala em 2,45× sem nenhum outro sintoma. */
+export type CalibrationSource = 'auto' | 'aruco' | 'card' | 'a4' | 'a5'
+
 export interface AnalyzeOptions {
   view?: ViewPoint
   shoeSize?: string
   shoeSizeSystem?: string
   detectCallosities?: boolean
+  calibration?: CalibrationSource
   signal?: AbortSignal
 }
 
@@ -62,6 +69,7 @@ export async function analyze(file: File | Blob, opts: AnalyzeOptions = {}): Pro
   if (opts.shoeSize) form.append('shoeSize', opts.shoeSize)
   if (opts.shoeSizeSystem) form.append('shoeSizeSystem', opts.shoeSizeSystem)
   form.append('detectCallosities', String(opts.detectCallosities ?? true))
+  form.append('calibration', opts.calibration ?? 'auto')
 
   const res = await fetch(`${BASE}/api/analyze`, {
     method: 'POST',
@@ -159,6 +167,11 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 export function markerPdfUrl(markerId = 7): string {
   return `${BASE}/api/marker.pdf?markerId=${markerId}`
+}
+
+/** Alvo de quatro marcadores — o layout recomendado, que evita extrapolação. */
+export function targetPdfUrl(target = 'board4'): string {
+  return `${BASE}/api/marker.pdf?target=${encodeURIComponent(target)}`
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

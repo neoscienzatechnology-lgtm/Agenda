@@ -23,6 +23,12 @@ Verificada re-detectando o marcador na imagem retificada e medindo seus lados:
 
 **A conversão pixel → milímetro não é a fonte de erro do sistema.**
 
+> **Correção importante (v1.1).** A versão anterior deste documento atribuía o viés
+> com câmera inclinada à perda de resolução dos entalhes interdigitais. **Aquela
+> explicação estava errada.** A causa medida é a **extrapolação da homografia** a
+> partir de um único marcador — ver `METROLOGY_CALIBRATION.md`. Com o alvo de quatro
+> marcadores o erro cai para ±0,11 mm e deixa de depender da inclinação.
+
 ### 1.2 Comprimento do pé, fim a fim (foto sintética → mm)
 
 | Condição | Erro de comprimento |
@@ -33,10 +39,20 @@ Verificada re-detectando o marcador na imagem retificada e medindo seus lados:
 | JPEG qualidade 70 | −0,03 mm |
 | Ruído σ = 6 | +0,12 mm |
 | Fundo escuro (podoscópio retroiluminado) | −0,01 mm |
-| Rolagem de câmera 8° | **+1,05 mm** |
-| Rolagem de câmera 17° | **+1,67 mm** |
-| Inclinação 10° | **+2,07 mm** |
-| Inclinação 20° | +0,30 mm |
+| Rolagem de câmera 8° | +1,05 mm ¹ |
+| Rolagem de câmera 17° | +1,67 mm ¹ |
+| Inclinação 10° | +2,07 mm ¹ |
+| Inclinação 20° | +0,30 mm ¹ |
+
+¹ Com **marcador único**. Com o alvo de quatro marcadores (`board4`), as mesmas
+condições dão −0,07 a −0,11 mm, sem dependência da inclinação:
+
+| Inclinação | 1 marcador | 4 marcadores |
+|---|---|---|
+| 0° | −0,03 mm | −0,09 mm |
+| 10° | −1,25 mm | −0,07 mm |
+| 18° | +0,93 mm | −0,10 mm |
+| 25° | −0,26 mm | −0,10 mm |
 
 ### 1.3 PDF (geometria em mm → arquivo)
 
@@ -49,39 +65,52 @@ MediaBox: 595,2756 × 841,8898 pt = 210,000 × 297,000 mm.
 
 ---
 
-## 2. A limitação dominante: fidelidade da silhueta dos pododáctilos
+## 2. A limitação dominante: cobertura da calibração
 
-O erro do sistema **não** está na calibração. Está em quão fielmente a silhueta dos
-dedos sobrevive à captura.
+O erro do sistema **não** está na conversão pixel→milímetro nem na segmentação. Está
+em **onde os pontos de controle estão** em relação à região medida.
 
-**Mecanismo.** Os entalhes interdigitais têm poucos milímetros de largura. Quando o
-borramento efetivo da foto cresce (inclinação ou rolagem da câmera, profundidade de
-campo, reamostragem), esses entalhes deixam de ser resolvidos e a silhueta "preenche"
-o vão entre os dedos. O contorno resultante fica **inflado para fora**, o que aumenta
-o comprimento medido.
+Com um marcador só, a homografia é exata sobre ele e extrapola para o resto da
+plataforma; o erro cresce com a distância e muda de sinal conforme a geometria da
+captura. Com quatro marcadores ao redor da área de apoio, os pés ficam interpolados e
+o erro fica estável em ±0,11 mm.
 
-Medido por região anatômica (inclinação 10°, desvio mediano em relação à verdade):
-
-| Região | Perpendicular | Inclinada 10° |
-|---|---|---|
-| Calcâneo | 0,141 mm | 0,204 mm |
-| Mediopé | 0,199 mm | 0,237 mm |
-| Antepé | 0,147 mm | 0,213 mm |
-| **Pododáctilos** | **0,144 mm** (p95 1,75) | **1,104 mm** (p95 3,63) |
-
-**Aumentar a resolução da retificação não corrige** (testado a 6, 9 e 12 px/mm: erro
-idêntico em 0,01 mm). A informação já se perdeu na fotografia.
+O diagnóstico completo, com os experimentos que descartaram as hipóteses de resolução
+e de borramento, está em **`METROLOGY_CALIBRATION.md`**.
 
 **Consequências práticas**
 
-* O viés é **sempre para mais**, nunca para menos — verificado em teste. Um molde
-  ligeiramente maior é recuperável no acabamento; um menor não é.
-* Fotografar o mais perpendicular possível é a única mitigação eficaz. O *quality
-  gate* mede a inclinação e avisa.
-* Larguras (antepé, mediopé, calcâneo) **não** sofrem esse efeito na mesma escala:
-  são medidas em regiões sem estrutura fina e permanecem em ~0,2 mm mesmo inclinadas.
+* Use o alvo de quatro marcadores (`GET /api/marker.pdf?target=board4`) para qualquer
+  medida destinada a fabricação.
+* O modo de marcador único continua disponível e avisa explicitamente que está
+  extrapolando, informando a distância em milímetros.
+* As **posições físicas** dos marcadores na plataforma são o que calibra o sistema.
+  Meça-as com paquímetro e ajuste o arquivo do alvo — não confie no desenho.
 
----
+### 2.1 Calibração por objeto de dimensão normalizada
+
+Quando a escala vem de um cartão ou de uma folha em vez do alvo impresso, somam-se
+**duas** limitações que não existem com ArUco:
+
+1. **A tolerância do próprio objeto é um piso de erro.** Cartão ISO/IEC 7810 ID-1:
+   ±0,13 mm → ±0,64 mm em um pé de 265 mm. Folha A4 (ISO 216): ±2 mm → **±2,52 mm**.
+   Nenhum processamento de imagem remove esse termo; é reportado em
+   `calibration.scaleToleranceMm`.
+2. **Não há como verificar a identidade do objeto.** O código de um ArUco é
+   verificável; um retângulo não é. Declarar "A4" para uma foto de cartão produz uma
+   medida internamente coerente e 2,45× errada. A única barreira é o limite físico de
+   comprimento plantar (90–400 mm), que reprova a captura — e a declaração explícita
+   exigida na interface.
+
+Detalhes, aritmética e números medidos em `CALIBRATION_WITHOUT_PRINTING.md`. Moeda e
+régua foram avaliadas e **recusadas**; o motivo está no mesmo documento.
+
+### 2.2 Erro residual após a correção
+
+Com o tabuleiro, o que resta (±0,11 mm, sistematicamente negativo) é erro de
+segmentação: a fronteira do contorno cai fração de milímetro para dentro. É uma ordem
+de grandeza menor que a variabilidade de posicionamento do pé entre capturas, e por
+isso não é hoje o gargalo de exatidão.
 
 ## 3. Outras limitações conhecidas
 

@@ -124,8 +124,14 @@ def _project_image_bounds_mm(H: np.ndarray, width: int, height: int,
 
 
 def build_rectification(bgr: np.ndarray, detection: MarkerDetection,
-                        H: np.ndarray | None = None) -> Rectification:
-    """Retifica a imagem para uma vista plantar ortogonal com escala mm conhecida."""
+                        H: np.ndarray | None = None,
+                        control_points_mm: np.ndarray | None = None) -> Rectification:
+    """Retifica a imagem para uma vista plantar ortogonal com escala mm conhecida.
+
+    ``control_points_mm`` são os pontos de controle da calibração (cantos de todos os
+    marcadores do alvo). A janela retificada é obrigada a contê-los: sem isso não há
+    como re-verificar a escala na imagem retificada.
+    """
     settings = get_settings()
     if H is None:
         H, _ = compute_homography(detection)
@@ -133,12 +139,17 @@ def build_rectification(bgr: np.ndarray, detection: MarkerDetection,
     height, width = bgr.shape[:2]
     size_mm = settings.marker_size_mm
 
+    if control_points_mm is None or len(control_points_mm) == 0:
+        control = marker_model_mm(size_mm)
+    else:
+        control = np.asarray(control_points_mm, dtype=np.float64).reshape(-1, 2)
+
     projected = _project_image_bounds_mm(H, width, height)
-    marker_center = np.array([size_mm / 2.0, size_mm / 2.0])
+    control_center = control.mean(axis=0)
     half = settings.working_area_mm / 2.0
 
     if projected is None:
-        lo, hi = marker_center - half, marker_center + half
+        lo, hi = control_center - half, control_center + half
     else:
         lo = projected.min(axis=0)
         hi = projected.max(axis=0)
@@ -150,9 +161,9 @@ def build_rectification(bgr: np.ndarray, detection: MarkerDetection,
         lo = center - span / 2.0
         hi = center + span / 2.0
 
-    # O marcador precisa estar sempre contido na janela retificada.
-    lo = np.minimum(lo, np.array([-2.0, -2.0]))
-    hi = np.maximum(hi, np.array([size_mm + 2.0, size_mm + 2.0]))
+    # Os pontos de controle precisam estar sempre contidos na janela retificada.
+    lo = np.minimum(lo, control.min(axis=0) - 2.0)
+    hi = np.maximum(hi, control.max(axis=0) + 2.0)
 
     px_per_mm = float(settings.rectified_px_per_mm)
     span = hi - lo
@@ -222,23 +233,66 @@ def build_rectification(bgr: np.ndarray, detection: MarkerDetection,
     )
 
 
-def verify_round_trip(rectification: Rectification) -> tuple[list[float], float]:
-    """Re-detecta o marcador na imagem retificada e mede seus lados em mm.
+def verify_round_trip(rectification: Rectification, target=None
+                      ) -> tuple[list[float], float]:
+    """Re-detecta os marcadores na imagem retificada e confere as distâncias em mm.
 
-    É a verificação **fim-a-fim** da cadeia metrológica: se a homografia, a escala e a
-    reamostragem estiverem corretas, cada lado deve medir 50,00 mm.
-    Devolve ``(lados_mm, erro_maximo_mm)``.
+    É a verificação **fim-a-fim** da cadeia metrológica. Com um marcador só, mede os
+    quatro lados (devem valer 50,00 mm) — mas isso valida a escala apenas *sobre o
+    marcador*, com braço de alavanca zero.
+
+    Com um alvo de vários marcadores a verificação fica muito mais forte: além dos
+    lados, compara as **distâncias entre marcadores** com as distâncias físicas
+    declaradas no alvo. Isso valida a escala ao longo de toda a plataforma, que é
+    exatamente onde a calibração de marcador único falha.
+
+    Devolve ``(distâncias_medidas_mm, erro_maximo_mm)``.
     """
     from .marker import detect_marker  # import local evita ciclo
 
     settings = get_settings()
+
+    if target is not None and getattr(target, "kind", "aruco") == "reference":
+        from .reference import verify_reference_round_trip
+
+        return verify_reference_round_trip(rectification, target)
+
     det = detect_marker(rectification.image)
     if not det.found:
         return [], float("inf")
 
-    corners_mm = rectification.rect_px_to_mm(det.corners_px)
-    sides = [
-        float(np.linalg.norm(corners_mm[(i + 1) % 4] - corners_mm[i])) for i in range(4)
-    ]
-    error = max(abs(s - settings.marker_size_mm) for s in sides)
-    return sides, float(error)
+    measured: list[float] = []
+    errors: list[float] = []
+
+    placements = {}
+    if target is not None:
+        placements = {m.marker_id: m for m in target.markers}
+
+    centers_mm: dict[int, np.ndarray] = {}
+    for marker in det.markers:
+        corners_mm = rectification.rect_px_to_mm(marker.corners_px)
+        expected_side = settings.marker_size_mm
+        placement = placements.get(marker.marker_id)
+        if placement is not None:
+            expected_side = placement.size_mm
+        for i in range(4):
+            side = float(np.linalg.norm(corners_mm[(i + 1) % 4] - corners_mm[i]))
+            measured.append(side)
+            errors.append(abs(side - expected_side))
+        centers_mm[marker.marker_id] = corners_mm.mean(axis=0)
+
+    # Distâncias entre marcadores: o teste que enxerga erro de extrapolação.
+    ids = sorted(i for i in centers_mm if i in placements)
+    for a_i in range(len(ids)):
+        for b_i in range(a_i + 1, len(ids)):
+            ia, ib = ids[a_i], ids[b_i]
+            got = float(np.linalg.norm(centers_mm[ia] - centers_mm[ib]))
+            expected = float(np.linalg.norm(
+                placements[ia].corners_mm().mean(axis=0)
+                - placements[ib].corners_mm().mean(axis=0)))
+            measured.append(got)
+            errors.append(abs(got - expected))
+
+    if not errors:
+        return [], float("inf")
+    return measured, float(max(errors))

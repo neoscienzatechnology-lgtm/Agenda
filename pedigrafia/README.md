@@ -1,8 +1,9 @@
 # Pedigrafia Digital
 
 PWA para produzir um **molde plantar em escala 1:1 real** a partir de uma fotografia
-de podoscópio, com a dimensão física derivada exclusivamente de um marcador fiducial
-de **50,00 × 50,00 mm**.
+de podoscópio, com a dimensão física derivada exclusivamente de uma referência de
+dimensão conhecida na cena — um marcador fiducial impresso de **50,00 × 50,00 mm**
+ou um objeto normalizado (cartão ISO/IEC 7810, folha A4).
 
 > **O número do calçado nunca dimensiona nada.** Ele existe apenas como conferência
 > de sanidade. Se a calibração medir 264,3 mm, o PDF sai com 264,3 mm.
@@ -19,10 +20,13 @@ de **50,00 × 50,00 mm**.
 | Área | Situação |
 |---|---|
 | Cadeia metrológica marcador → mm | Verificada: erro de ida-e-volta 0,005–0,072 mm |
-| Comprimento fim a fim (sintético, perpendicular) | −0,04 a +0,12 mm |
-| Comprimento fim a fim (câmera inclinada 10–20°) | até +2,1 mm — ver limitações |
+| Comprimento fim a fim — alvo de 4 marcadores | **−0,064 mm média, 0,137 mm pior caso** (inclinação até 24°) |
+| Comprimento fim a fim — marcador único | −0,14 mm média, 1,30 mm pior caso |
+| Comprimento fim a fim — sem impressora: folha A4 | −0,23 mm média, **0,30 mm pior caso** (+ tolerância do papel) |
+| Comprimento fim a fim — sem impressora: cartão | +0,13 mm média, 1,14 mm pior caso |
+| Incerteza herdada do padrão físico (não removível) | cartão ±0,64 mm · folha A4 ±2,52 mm, em um pé de 265 mm |
 | PDF A4 1:1 relido do arquivo | erro 0,0000 mm em 200/240/260/265/270 mm |
-| Testes | 118 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
+| Testes | 161 pytest · 10 vitest · 4 end-to-end (desktop + mobile) |
 | Validação com hardware/pés reais | **não realizada** — ver `docs/VALIDATION_CHECKLIST.md` |
 
 **Este sistema não tem precisão clínica nem metrológica validada.** Os números acima
@@ -36,7 +40,7 @@ pedigrafia/
 ├── frontend/         PWA React + TypeScript + Vite (editor vetorial em canvas)
 ├── backend/          API FastAPI + pipeline de visão (OpenCV/NumPy/scikit-image)
 │   └── app/
-│       ├── calibration/   marcador ArUco/AprilTag, homografia, escala px→mm
+│       ├── calibration/   alvo multi-marcador, retângulo normalizado, homografia, px→mm
 │       ├── quality/       métricas objetivas e quality gate 0–100
 │       ├── segmentation/  interface plugável + clássico + ponte ONNX
 │       ├── geometry/      polígonos em mm, frame do pé, contorno sub-pixel
@@ -47,7 +51,7 @@ pedigrafia/
 │       ├── pdf/           construtor A4 1:1 + inspetor de content stream
 │       ├── synth/         gerador de cenas com verdade geométrica conhecida
 │       └── api/           rotas
-├── ml-or-vision/     adaptadores de modelos (ONNX) e guia de treino
+├── ml-or-vision/     dataset sintético, treino U-Net, exportação ONNX, benchmark em mm
 ├── tests/            pytest, fixture de paridade, end-to-end Playwright
 └── docs/             arquitetura, metrologia, limitações, validação física
 ```
@@ -59,6 +63,8 @@ pedigrafia/
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Arquitetura, cadeia metrológica, invariantes testados |
 | [`docs/COORDINATE_SYSTEM.md`](docs/COORDINATE_SYSTEM.md) | Os cinco frames e as conversões exatas |
 | [`docs/RUNNING.md`](docs/RUNNING.md) | Rodar, testar, configurar e implantar |
+| [`docs/METROLOGY_CALIBRATION.md`](docs/METROLOGY_CALIBRATION.md) | Por que um marcador só não basta — diagnóstico medido |
+| [`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md) | Calibrar com cartão ou folha A4, e quanto se perde |
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Exatidão medida e limitações conhecidas |
 | [`docs/VALIDATION_CHECKLIST.md`](docs/VALIDATION_CHECKLIST.md) | Validação com régua e impressão reais |
 | [`docs/TRAINING.md`](docs/TRAINING.md) | Treinar um modelo específico de segmentação |
@@ -72,12 +78,36 @@ PYTHONPATH=backend .venv/bin/uvicorn app.main:app --port 8000 &
 cd frontend && npm install && npm run dev      # http://localhost:5173
 ```
 
-Imprima o marcador em `http://localhost:8000/api/marker.pdf` (**100 %, sem ajustar à
-página**), confira com régua que mede 50,00 mm, e cole em superfície rígida.
+Imprima o alvo de calibração em
+`http://localhost:8000/api/marker.pdf?target=board4` (**100 %, sem ajustar à página**),
+confira com régua que cada quadrado mede 50,00 mm, e cole os quatro marcadores nas
+coordenadas indicadas em cada folha, ao redor da área de apoio.
+
+> Um marcador só também funciona (`?markerId=7`), mas a escala passa a ser
+> **extrapolada** para longe dele — o erro sobe de 0,14 mm para 1,3 mm. O sistema avisa
+> quando está nessa condição.
+
+### Sem impressora
+
+Um objeto de dimensão normalizada serve de referência: **cartão** de 85,60 × 53,98 mm
+(ISO/IEC 7810 ID-1) ou **folha A4**. Basta declarar qual foi usado na captura.
+
+O custo é medido e reportado, não escondido:
+
+* o **cartão** é pequeno, então a escala volta a ser extrapolada — quatro cartões ao
+  redor dos pés trazem a cobertura ao nível do alvo impresso;
+* a **folha A4** é geometricamente a melhor referência sem impressora (0,30 mm de pior
+  caso), mas carrega ±2 mm de tolerância de corte, ou seja ±2,5 mm em um pé de 265 mm,
+  que nenhum algoritmo remove. Medir a folha com paquímetro e declarar as dimensões
+  reais elimina esse termo;
+* **moeda e régua foram recusadas** — o porquê, com a aritmética, está em
+  [`docs/CALIBRATION_WITHOUT_PRINTING.md`](docs/CALIBRATION_WITHOUT_PRINTING.md).
 
 ## Princípios que o código impõe
 
-1. **A escala vem do marcador.** Nenhum outro caminho define dimensão física.
+1. **A escala vem de uma referência física de dimensão conhecida** — marcador impresso
+   ou objeto normalizado. Nenhum outro caminho define dimensão física, e o sistema
+   informa se está interpolando entre pontos de controle ou extrapolando a partir de um.
 2. **Geometria em milímetros, sempre.** Pixels existem só para rasterizar; a única
    conversão px↔mm vive em `calibration/homography.py` e em `geom/units.ts`.
 3. **Posicionamento no PDF é isometria.** `|det(M)| = 1`, verificado em teste; as
@@ -101,13 +131,15 @@ página**), confira com régua que mede 50,00 mm, e cole em superfície rígida.
 | `POST /api/review/approve` | Emite o `reviewToken` (revisão obrigatória) |
 | `POST /api/export-pdf` | PDF A4 1:1, um pé por folha |
 | `POST /api/render-annotated` | PNG anotado (análise visual) |
-| `GET /api/marker.pdf` | Folha de calibração 50 × 50 mm |
+| `GET /api/marker.pdf?target=board4` | Alvo de calibração de 4 marcadores (recomendado) |
+| `GET /api/marker.pdf` | Marcador único de 50 × 50 mm |
+| `GET /api/references` | Objetos aceitos como referência sem impressão — e os recusados |
 | `POST /api/verify-pdf` | QA: relê um PDF e confere a dimensão física |
 | `DELETE /api/session/{id}` | Apaga a sessão temporária |
 
 Documentação interativa em `/docs`.
 
-## Fora do escopo deste MVP
+## Fora do escopo desta versão
 
 Login, cadastro de pacientes, prontuário, histórico, agenda, pagamentos,
 multiempresa, faturamento, estoque e CRM — deliberadamente não implementados.

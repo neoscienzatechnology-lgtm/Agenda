@@ -1,4 +1,4 @@
-import { markerPdfUrl } from '../api/client'
+import { markerPdfUrl, targetPdfUrl } from '../api/client'
 
 export function StartScreen({ onStart }: { onStart: () => void }) {
   return (
@@ -9,18 +9,34 @@ export function StartScreen({ onStart }: { onStart: () => void }) {
           Molde plantar em <span className="accent">escala 1:1 real</span>
         </h1>
         <p className="lead">
-          Posicione o(s) pé(s) sobre a plataforma e mantenha o marcador de referência de
-          50 × 50 mm totalmente visível. A dimensão física vem exclusivamente da
-          calibração geométrica do marcador — nunca do número do calçado.
+          Posicione o(s) pé(s) sobre a plataforma e deixe uma referência de dimensão
+          conhecida no mesmo plano da planta: o alvo impresso ou um objeto padronizado,
+          como um cartão. Uma fotografia sozinha não contém tamanho — a escala vem
+          dessa referência, nunca do número do calçado.
         </p>
 
         <button className="primary big" type="button" onClick={onStart}>
           Nova pedigrafia
         </button>
 
-        <a className="ghost link" href={markerPdfUrl()} target="_blank" rel="noreferrer">
-          Baixar marcador de calibração (imprimir em 100%)
+        <a className="secondary link" href={targetPdfUrl()} target="_blank" rel="noreferrer">
+          Baixar alvo de calibração — 4 marcadores (mais exato)
         </a>
+        <a className="ghost link" href={markerPdfUrl()} target="_blank" rel="noreferrer">
+          Marcador único (menos exato longe do marcador)
+        </a>
+        <p className="note small">
+          <strong>Sem impressora?</strong> Um cartão de 85,60 × 53,98 mm (ISO/IEC 7810)
+          ou uma folha A4 servem de referência. É menos exato: o cartão é pequeno, então
+          a escala volta a ser extrapolada — quatro cartões ao redor da área de apoio
+          trazem a cobertura ao nível do alvo impresso. E a folha A4 traz a tolerância de corte do papel, ±2 mm, que
+          nenhum algoritmo remove.
+        </p>
+        <p className="note small">
+          Com quatro marcadores ao redor da área de apoio a escala é interpolada entre
+          eles. Com uma referência só, ela é extrapolada, e o erro cresce com a distância
+          até ela — medido em até 2 mm.
+        </p>
       </div>
 
       <ol className="start-steps">

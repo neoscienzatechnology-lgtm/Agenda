@@ -55,6 +55,47 @@ class MarkerInfo(_Base):
     roundTripErrorMm: float = 0.0
 
 
+class ReferenceObjectInfo(_Base):
+    """Objeto de dimensão normalizada usado no lugar do marcador impresso."""
+
+    key: str
+    label: str
+    widthMm: float
+    heightMm: float
+    toleranceMm: float
+    standard: str
+    note: str = ""
+    scaleToleranceRel: float = 0.0
+    """Incerteza relativa de escala imposta pela tolerância do próprio objeto."""
+
+
+class CalibrationInfo(_Base):
+    """Como a escala física foi estabelecida — e o quanto ela está extrapolando."""
+
+    targetName: str
+    markerCount: int
+    usedMarkerIds: list[int] = Field(default_factory=list)
+    residualRmsMm: float = 0.0
+    residualMaxMm: float = 0.0
+    exact: bool = True
+    """``True`` com 4 pontos (um marcador): o ajuste é exato e o resíduo não informa nada."""
+    coverageSpanMm: list[float] = Field(default_factory=list)
+    extrapolationMm: float = 0.0
+    """Distância dos pés até o casco dos pontos de controle. 0 = interpolado."""
+    interpolated: bool = False
+    source: str = "aruco"
+    """``aruco`` (marcador impresso) ou ``reference`` (objeto de dimensão normalizada)."""
+    reference: Optional[ReferenceObjectInfo] = None
+    scaleToleranceRel: float = 0.0
+    """Incerteza de escala herdada do padrão físico, que nenhum algoritmo remove."""
+    scaleToleranceMm: float = 0.0
+    """A mesma incerteza aplicada ao maior pé medido, em mm."""
+    controlPointsMm: list[PointMm] = Field(default_factory=list)
+    """Cantos usados como pontos de controle, no plano em mm — permitem à interface
+    mostrar exatamente de onde veio a escala."""
+    warnings: list[str] = Field(default_factory=list)
+
+
 class RectificationInfo(_Base):
     pxPerMm: float
     originMm: PointMm
@@ -233,6 +274,7 @@ class AnalyzeResponse(_Base):
     view: ViewPoint
     captureQuality: CaptureQuality
     marker: MarkerInfo
+    calibration: Optional[CalibrationInfo] = None
     rectification: Optional[RectificationInfo] = None
     rectifiedImageUrl: Optional[str] = None
     feet: list[FootAnalysis] = Field(default_factory=list)

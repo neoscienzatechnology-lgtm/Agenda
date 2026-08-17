@@ -20,7 +20,7 @@ from reportlab.lib.colors import Color
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas as pdfcanvas
 
-from ..config import MM_TO_PT, get_settings
+from ..config import A4_HEIGHT_MM, A4_WIDTH_MM, MM_TO_PT, get_settings
 from ..geometry.polygon import as_xy
 from .geometry_page import PagePlacement, compute_placement
 
@@ -224,6 +224,84 @@ def build_foot_pdf(*, contour_mm, axis_a_mm, axis_b_mm, laterality: str,
     return PdfBuildResult(data=buf.getvalue(), placement=placement,
                           length_mm=length_mm,
                           fits_on_page=placement.fits_on_page, warnings=warnings)
+
+
+def build_target_sheet_pdf(target, page_margin_mm: float = 10.0) -> bytes:
+    """Folha(s) imprimíveis do alvo de calibração de vários marcadores.
+
+    Cada marcador sai em **tamanho físico exato** com marcas de conferência e a sua
+    posição declarada em milímetros impressa ao lado. Se o alvo for maior que a folha
+    A4 — o caso normal, já que a área útil tem ~320 × 480 mm — cada marcador vai em uma
+    página, e a folha traz as coordenadas para posicioná-lo na plataforma.
+
+    **A métrica do sistema é a posição FÍSICA dos marcadores na plataforma, não este
+    desenho.** Depois de colar, meça as distâncias entre marcadores com trena/paquímetro
+    e, se divergirem, corrija o arquivo do alvo — não o contrário.
+    """
+    from reportlab.lib.utils import ImageReader
+
+    from ..calibration.marker import generate_marker_image
+    from ..image_io import encode_png
+
+    settings = get_settings()
+    buf = io.BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=A4)
+    c.setTitle(f"Alvo de calibração '{target.name}' — Pedigrafia Digital")
+    c.setAuthor(settings.pdf_author)
+    span_w, span_h = target.span_mm()
+    c.setKeywords(
+        f"target={target.name}; markers={len(target.markers)}; "
+        f"spanMm={span_w:.2f}x{span_h:.2f}; dictionary={target.dictionary}"
+    )
+
+    for index, placement in enumerate(target.markers):
+        size_mm = placement.size_mm
+        img = generate_marker_image(placement.marker_id, 1200, target.dictionary)
+        reader = ImageReader(io.BytesIO(encode_png(np.dstack([img] * 3))))
+
+        x = (A4_WIDTH_MM - size_mm) / 2.0
+        y = A4_HEIGHT_MM - 92.0 - size_mm
+        c.drawImage(reader, x * MM_TO_PT, y * MM_TO_PT,
+                    width=size_mm * MM_TO_PT, height=size_mm * MM_TO_PT,
+                    preserveAspectRatio=False, mask=None)
+
+        c.setStrokeColorRGB(0.6, 0.6, 0.6)
+        c.setLineWidth(0.3)
+        for xx in (x, x + size_mm):
+            c.line(xx * MM_TO_PT, (y - 8) * MM_TO_PT, xx * MM_TO_PT, (y - 3) * MM_TO_PT)
+        c.line(x * MM_TO_PT, (y - 5.5) * MM_TO_PT,
+               (x + size_mm) * MM_TO_PT, (y - 5.5) * MM_TO_PT)
+
+        c.setFillColorRGB(*TEXT_RGB)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawCentredString(105 * MM_TO_PT, (A4_HEIGHT_MM - 26) * MM_TO_PT,
+                            f"Alvo de calibração — marcador {placement.marker_id} "
+                            f"({index + 1} de {len(target.markers)})")
+        c.setFont("Helvetica", 9)
+        lines = [
+            PRINT_NOTICE,
+            f"Confira com régua: o quadrado deve medir {size_mm:.2f} mm de lado.",
+            "",
+            f"Posição na plataforma — canto superior esquerdo deste marcador:",
+            f"    X = {placement.origin_mm[0]:.1f} mm     "
+            f"Y = {placement.origin_mm[1]:.1f} mm",
+            f"(origem = canto superior esquerdo da área útil de "
+            f"{span_w:.0f} × {span_h:.0f} mm)",
+            "",
+            "Cole sobre superfície rígida, no MESMO plano da planta do pé.",
+            "Mantenha a borda branca (zona de silêncio) ao redor do quadrado.",
+            "Depois de colar, meça as distâncias entre marcadores e confira",
+            "com as coordenadas acima — é essa medida física que calibra o sistema.",
+        ]
+        yy = y - 22.0
+        for line in lines:
+            c.drawCentredString(105 * MM_TO_PT, yy * MM_TO_PT, line)
+            yy -= 5.6
+        c.showPage()
+
+    c.save()
+    del page_margin_mm
+    return buf.getvalue()
 
 
 def build_marker_sheet_pdf(marker_id: int = 7, dictionary: str | None = None) -> bytes:

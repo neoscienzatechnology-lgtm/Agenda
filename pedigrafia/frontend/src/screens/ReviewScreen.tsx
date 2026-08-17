@@ -320,6 +320,78 @@ export function ReviewScreen({
               </section>
             )}
 
+            {analysis.calibration && (
+              <section
+                className={
+                  analysis.calibration.interpolated
+                    ? 'panel-section'
+                    : 'panel-section warn-section'
+                }
+              >
+                <h3>Calibração</h3>
+                <dl className="measure-list">
+                  <Measure
+                    label="Referência de escala"
+                    value={
+                      analysis.calibration.reference
+                        ? `${analysis.calibration.reference.label} — ${analysis.calibration.reference.widthMm} × ${analysis.calibration.reference.heightMm} mm`
+                        : 'Marcador impresso de 50 mm'
+                    }
+                  />
+                  <Measure
+                    label={
+                      analysis.calibration.source === 'reference'
+                        ? 'Objetos usados'
+                        : 'Marcadores usados'
+                    }
+                    value={String(analysis.calibration.markerCount)}
+                  />
+                  <Measure
+                    label="Escala na região dos pés"
+                    value={analysis.calibration.interpolated ? 'interpolada' : 'extrapolada'}
+                    strong={!analysis.calibration.interpolated}
+                  />
+                  {!analysis.calibration.interpolated && (
+                    <Measure
+                      label="Distância fora da área calibrada"
+                      value={mm(analysis.calibration.extrapolationMm)}
+                    />
+                  )}
+                  {!analysis.calibration.exact && (
+                    <Measure
+                      label="Resíduo do ajuste"
+                      value={mm(analysis.calibration.residualMaxMm, 2)}
+                    />
+                  )}
+                  {analysis.calibration.scaleToleranceMm > 0 && (
+                    <Measure
+                      label="Incerteza do próprio padrão"
+                      value={`± ${mm(analysis.calibration.scaleToleranceMm, 2)}`}
+                      strong={analysis.calibration.scaleToleranceMm >= 1}
+                    />
+                  )}
+                </dl>
+                {analysis.calibration.reference && (
+                  <p className="note small">
+                    {analysis.calibration.reference.standard} admite ±
+                    {analysis.calibration.reference.toleranceMm} mm no próprio objeto. Isso
+                    entra como erro proporcional no molde e{' '}
+                    <strong>nenhum processamento de imagem o remove</strong> — só um
+                    padrão mais bem controlado.
+                  </p>
+                )}
+                {!analysis.calibration.interpolated && (
+                  <p className="note small">
+                    A escala está sendo extrapolada a partir de uma única referência: a
+                    exatidão cai com a distância até ela.{' '}
+                    {analysis.calibration.source === 'reference'
+                      ? 'Espalhe mais objetos iguais ao redor da área de apoio — com quatro a cobertura fica equivalente à do alvo impresso.'
+                      : 'Para medidas de fabricação, use o alvo de quatro marcadores ao redor da área de apoio.'}
+                  </p>
+                )}
+              </section>
+            )}
+
             <section className="panel-section">
               <h3>Confiança da detecção</h3>
               <Confidence value={analysis.feet[state.activeFootIndex]?.confidence.segmentation ?? 0} label="Segmentação" />

@@ -436,6 +436,76 @@ button:disabled {
   gap: 10px;
 }
 
+/* Seletor da referência de escala: é a decisão metrológica da captura, então fica
+   visível e não escondido em "Opções". */
+.calibration-picker {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.calibration-picker legend {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 6px;
+}
+
+.calibration-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.calibration-option {
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  padding: 10px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.calibration-option strong {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.calibration-option span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calibration-option.selected {
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px var(--blue);
+  background: var(--blue-soft);
+}
+
+.calibration-option.selected strong {
+  color: var(--blue);
+}
+
+.calibration-option:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (max-width: 420px) {
+  .calibration-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .capture-extra summary {
   cursor: pointer;
   font-size: 14px;

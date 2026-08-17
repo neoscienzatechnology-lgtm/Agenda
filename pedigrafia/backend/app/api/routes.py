@@ -12,7 +12,8 @@ from fastapi.responses import JSONResponse, Response
 from .. import schemas as S
 from ..config import get_settings
 from ..image_io import decode_image, encode_png
-from ..pdf.builder import CONTOUR_RGB, build_foot_pdf, build_marker_sheet_pdf
+from ..pdf.builder import (CONTOUR_RGB, build_foot_pdf, build_marker_sheet_pdf,
+                           build_target_sheet_pdf)
 from ..pdf.inspect import inspect_pdf, path_axis_length_mm, path_max_caliper_mm
 from ..pipeline import PipelineBlocked, analyze
 from ..render.annotated import AnnotatedRenderer
@@ -44,6 +45,45 @@ def config() -> dict:
         "minQualityScore": s.quality.min_total_score,
         "segmenter": s.segmenter,
         "a4": {"widthMm": 210.0, "heightMm": 297.0},
+        "referenceObjects": _reference_catalogue(),
+    }
+
+
+def _reference_catalogue() -> list[dict]:
+    from ..calibration.reference import CATALOGUE
+
+    return [{
+        "key": r.key, "label": r.label,
+        "widthMm": r.width_mm, "heightMm": r.height_mm,
+        "toleranceMm": r.tolerance_mm, "standard": r.standard, "note": r.note,
+        "scaleToleranceRel": round(r.scale_tolerance_rel, 6),
+        "scaleToleranceMmAt265": round(265.0 * r.scale_tolerance_rel, 2),
+    } for r in CATALOGUE.values()]
+
+
+@router.get("/references")
+def references() -> dict:
+    """Objetos de dimensão normalizada aceitos como referência de escala.
+
+    ``scaleToleranceMmAt265`` é o erro de comprimento que a tolerância do próprio
+    objeto impõe a um pé de 265 mm — um piso que nenhum processamento de imagem
+    consegue baixar.
+    """
+    return {
+        "objects": _reference_catalogue(),
+        "rejected": [
+            {"key": "coin", "label": "Moeda",
+             "reason": ("A projeção de um círculo é uma elipse, e sem os parâmetros "
+                        "intrínsecos da câmera ela só dá escala assumindo o plano "
+                        "frontal. Com a moeda a 150 mm do pé, inclinação de 3° e "
+                        "câmera a 600 mm, o erro é de 1,3 % (3,4 mm em 265 mm) — e "
+                        "3° é indistinguível pela razão dos eixos da elipse. Erraria "
+                        "sem avisar.")},
+            {"key": "ruler", "label": "Régua",
+             "reason": ("Os quatro cantos de uma régua são quase colineares em uma "
+                        "direção; a homografia fica malcondicionada exatamente onde "
+                        "precisaria corrigir a perspectiva.")},
+        ],
     }
 
 
@@ -56,7 +96,17 @@ async def analyze_endpoint(
     shoeSize: str = Form(default=""),
     shoeSizeSystem: str = Form(default="BR"),
     detectCallosities: str = Form(default="true"),
+    calibration: str = Form(default="auto"),
 ) -> S.AnalyzeResponse:
+    """``calibration``: ``aruco`` (marcador impresso), a chave de um objeto de
+    referência (``card``, ``a4``, …) ou ``auto``.
+
+    Declarar o objeto não é burocracia: a razão largura/altura de um cartão e a de
+    uma folha A4 ficam a ~11 % uma da outra, dentro do ruído de localização de
+    cantos em foto de celular, e trocá-las erraria a escala em 2,45× sem produzir
+    nenhum outro sintoma. Em ``auto`` o sistema só decide sozinho quando a forma
+    prova de qual objeto se trata; caso contrário, pede.
+    """
     settings = get_settings()
     data = await image.read()
     try:
@@ -73,7 +123,11 @@ async def analyze_endpoint(
     chosen_view = view if view in ("below", "above") else settings.default_view
     try:
         result = analyze(decoded, view=chosen_view,
-                         detect_callosity=detectCallosities.lower() != "false")
+                         detect_callosity=detectCallosities.lower() != "false",
+                         calibration=calibration)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail={
+            "code": "bad_calibration", "message": str(exc)}) from exc
     except PipelineBlocked as exc:
         # Não é erro do servidor: é o quality gate funcionando.
         return JSONResponse(status_code=422, content={
@@ -288,16 +342,29 @@ def render_annotated(body: S.RenderAnnotatedRequest) -> Response:
 
 # ------------------------------------------------------------------ ferramentas
 @router.get("/marker.pdf")
-def marker_pdf(markerId: int = 7, dictionary: str = "") -> Response:
+def marker_pdf(markerId: int = 7, dictionary: str = "", target: str = "") -> Response:
+    """Folha de calibração imprimível.
+
+    Sem ``target``: um marcador único (compatibilidade). Com ``target=board4``: o alvo
+    de quatro marcadores, que é o **recomendado** — ele elimina a extrapolação da
+    homografia, que é a maior fonte de erro do sistema.
+    """
     if not (0 <= markerId <= 999):
         raise HTTPException(status_code=400, detail={"code": "bad_marker_id"})
     try:
-        data = build_marker_sheet_pdf(markerId, dictionary or None)
-    except ValueError as exc:
+        if target:
+            from ..calibration.target import resolve_target
+
+            data = build_target_sheet_pdf(resolve_target(target))
+            filename = f"alvo-calibracao-{target}.pdf"
+        else:
+            data = build_marker_sheet_pdf(markerId, dictionary or None)
+            filename = "marcador-50mm.pdf"
+    except (ValueError, OSError, KeyError) as exc:
         raise HTTPException(status_code=400, detail={
-            "code": "bad_dictionary", "message": str(exc)}) from exc
+            "code": "bad_target", "message": str(exc)}) from exc
     return Response(content=data, media_type="application/pdf", headers={
-        "Content-Disposition": 'inline; filename="marcador-50mm.pdf"'})
+        "Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @router.post("/verify-pdf", response_model=S.PdfVerification)

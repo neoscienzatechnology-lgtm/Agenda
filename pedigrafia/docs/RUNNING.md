@@ -41,7 +41,8 @@ cacheadas** — uma medida servida de cache seria uma medida potencialmente erra
 ```bash
 cd pedigrafia
 
-# Backend — 118 testes (calibração, geometria, PDF, API, segurança, quality gate)
+# Backend — 161 testes (calibração, referência sem impressora, geometria, PDF,
+#           API, segurança, quality gate)
 .venv/bin/python -m pytest tests/backend -q
 
 # Paridade das medidas em TypeScript — 10 testes
@@ -70,6 +71,12 @@ Tudo via variáveis de ambiente com prefixo `PEDIGRAFIA_`. As principais:
 | `PEDIGRAFIA_MARKER_SIZE_MM` | `50.0` | Aresta física do marcador |
 | `PEDIGRAFIA_MARKER_DICTIONARY` | `DICT_4X4_50` | ArUco/AprilTag (`DICT_APRILTAG_36H11`, …) |
 | `PEDIGRAFIA_MARKER_ID` | `-1` | `-1` aceita qualquer id do dicionário |
+| `PEDIGRAFIA_TARGET` | `auto` | `auto`, `single`, `board4` ou caminho de um JSON de alvo |
+| `PEDIGRAFIA_REFERENCE_OBJECT` | `auto` | Referência sem impressão: `auto`, `off`, `card`, `a4`, `a5` ou `"LxA"` |
+| `PEDIGRAFIA_REFERENCE_CUSTOM_MM` | — | Retângulo próprio: `"85.6x53.98@0.1"` |
+| `PEDIGRAFIA_PRINTED_TARGET_TOLERANCE_MM` | `0.20` | Tolerância assumida do alvo impresso |
+| `PEDIGRAFIA_MAX_EXTRAPOLATION_WARN_MM` | `60` | Acima disso o score cai |
+| `PEDIGRAFIA_MAX_EXTRAPOLATION_BLOCK_MM` | `450` | Acima disso a captura é recusada |
 | `PEDIGRAFIA_RECTIFIED_PX_PER_MM` | `6.0` | Amostragem do raster retificado |
 | `PEDIGRAFIA_WORKING_AREA_MM` | `700.0` | Janela física máxima retificada |
 | `PEDIGRAFIA_SEGMENTER` | `classical` | `classical` ou `onnx` |

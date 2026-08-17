@@ -28,11 +28,28 @@ class FootSpec:
 
 
 @dataclass
+class ReferenceSpec:
+    """Objeto retangular de dimensão normalizada largado sobre a plataforma."""
+
+    key: str = "card"
+    origin_mm: tuple[float, float] = (0.0, 0.0)
+    rotation_deg: float = 0.0
+    bgr: tuple[int, int, int] = (176, 128, 62)
+
+
+@dataclass
 class SceneSpec:
     feet: list[FootSpec] = field(default_factory=list)
     view: str = "below"
     marker_origin_mm: tuple[float, float] = (-25.0, 168.0)
     marker_id: int = 7
+    references: list = field(default_factory=list)
+    """``ReferenceSpec``s. Quando presentes, nenhum marcador ArUco é desenhado — a
+    cena passa a testar exatamente o caminho de calibração por objeto conhecido."""
+    target: object = None
+    """Alvo de calibração multi-marcador. Quando definido, ``marker_origin_mm`` e
+    ``marker_id`` são ignorados e os marcadores são desenhados nas posições físicas
+    declaradas pelo alvo."""
     plane_px_per_mm: float = 8.0
     plane_extent_mm: tuple[float, float, float, float] = (-210.0, -200.0, 210.0, 245.0)
     image_size: tuple[int, int] = (2400, 3200)   # (largura, altura)
@@ -118,7 +135,7 @@ def _camera_homography(spec: SceneSpec, center_mm: np.ndarray,
 
 
 def _render_plane(spec: SceneSpec, rng: np.random.Generator
-                  ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+                  ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray], np.ndarray]:
     settings = get_settings()
     x0, y0, x1, y1 = spec.plane_extent_mm
     ppm = spec.plane_px_per_mm
@@ -144,67 +161,163 @@ def _render_plane(spec: SceneSpec, rng: np.random.Generator
             center_mm=foot.center_mm, rotation_deg=foot.rotation_deg,
         )
         contours_mm.append(poly_mm)
-        pts = to_px(poly_mm).astype(np.int32)
+        # `astype(int32)` truncaria em direção a zero e introduziria até 1 px de
+        # viés sistemático no contorno de VERDADE. `shift` preserva sub-pixel.
+        shift = 4
+        pts = np.round(to_px(poly_mm) * (1 << shift)).astype(np.int32)
         layer = np.zeros((h, w), dtype=np.uint8)
-        cv2.fillPoly(layer, [pts], 255, lineType=cv2.LINE_AA)
+        cv2.fillPoly(layer, [pts], 255, lineType=cv2.LINE_AA, shift=shift)
         alpha = (layer.astype(np.float32) / 255.0)[:, :, None]
         skin = np.array(spec.skin_bgr, dtype=np.float32)[None, None, :]
         texture = rng.normal(0.0, 6.0, (h, w, 1)).astype(np.float32)
         # Leve gradiente radial para simular volume/iluminação da planta.
         canvas = canvas * (1 - alpha) + (skin + texture) * alpha
 
-    # --- marcador de 50 × 50 mm ---
-    mx, my = spec.marker_origin_mm
-    side_px = int(round(settings.marker_size_mm * ppm))
-    marker = generate_marker_image(spec.marker_id, side_px)
+    # --- objetos de referência de dimensão normalizada ---
+    if spec.references:
+        from ..calibration.reference import resolve_reference
+
+        all_corners: list[np.ndarray] = []
+        for item in spec.references:
+            ref = resolve_reference(item.key)
+            corners = _reference_corners_mm(ref, item)
+            for poly_mm in contours_mm:
+                if _polygons_intersect(corners, poly_mm):
+                    raise ValueError(
+                        f"objeto de referência {item.key} sobrepõe um pé na cena")
+            outline = _rounded_rect_mm(corners, ref.corner_radius_mm)
+            pts = np.round(to_px(outline) * (1 << 4)).astype(np.int32)
+            layer = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillPoly(layer, [pts], 255, lineType=cv2.LINE_AA, shift=4)
+            alpha = (layer.astype(np.float32) / 255.0)[:, :, None]
+            body = np.array(item.bgr, dtype=np.float32)[None, None, :]
+            body = body + rng.normal(0.0, 3.0, (h, w, 1)).astype(np.float32)
+            canvas = canvas * (1 - alpha) + body * alpha
+            all_corners.append(corners)
+
+        plane_img = np.clip(canvas, 0, 255).astype(np.uint8)
+        return (plane_img, all_corners[0], contours_mm, np.vstack(all_corners))
+
+    # --- marcadores de calibração ---
     quiet_mm = 12.0
     quiet_px = int(round(quiet_mm * ppm))
-    px0 = int(round((mx - x0) * ppm))
-    py0 = int(round((my - y0) * ppm))
-    qx0, qy0 = px0 - quiet_px, py0 - quiet_px
-    qx1, qy1 = px0 + side_px + quiet_px, py0 + side_px + quiet_px
-    if qx0 < 0 or qy0 < 0 or qx1 > w or qy1 > h:
-        raise ValueError("marcador fora da extensão do plano sintético")
-    # A zona de silêncio não pode cobrir nenhum pé — isso invalidaria a verdade
-    # geométrica da cena.
-    quiet_mm_box = (mx - quiet_mm, my - quiet_mm,
-                    mx + settings.marker_size_mm + quiet_mm,
-                    my + settings.marker_size_mm + quiet_mm)
-    for poly_mm in contours_mm:
-        lo, hi = poly_mm.min(axis=0), poly_mm.max(axis=0)
-        if (lo[0] < quiet_mm_box[2] and hi[0] > quiet_mm_box[0]
-                and lo[1] < quiet_mm_box[3] and hi[1] > quiet_mm_box[1]):
-            raise ValueError(
-                "zona de silêncio do marcador sobrepõe um pé na cena sintética"
-            )
-    canvas[qy0:qy1, qx0:qx1] = 250.0
-    canvas[py0:py0 + side_px, px0:px0 + side_px] = marker[:, :, None].astype(np.float32)
 
-    marker_corners_plane = np.array([
-        [mx, my],
-        [mx + settings.marker_size_mm, my],
-        [mx + settings.marker_size_mm, my + settings.marker_size_mm],
-        [mx, my + settings.marker_size_mm],
-    ], dtype=np.float64)
+    if spec.target is not None:
+        placements = [(m.marker_id, m.origin_mm, m.size_mm) for m in spec.target.markers]
+    else:
+        placements = [(spec.marker_id, spec.marker_origin_mm, settings.marker_size_mm)]
+
+    first_corners = None
+    all_marker_corners: list[np.ndarray] = []
+    for mid, (mx, my), size_mm in placements:
+        side_px = int(round(size_mm * ppm))
+        marker = generate_marker_image(mid, side_px)
+        px0 = int(round((mx - x0) * ppm))
+        py0 = int(round((my - y0) * ppm))
+        qx0, qy0 = px0 - quiet_px, py0 - quiet_px
+        qx1, qy1 = px0 + side_px + quiet_px, py0 + side_px + quiet_px
+        if qx0 < 0 or qy0 < 0 or qx1 > w or qy1 > h:
+            raise ValueError(f"marcador {mid} fora da extensão do plano sintético")
+        # A zona de silêncio não pode cobrir nenhum pé — isso invalidaria a verdade
+        # geométrica da cena.
+        # Sobreposição REAL entre a zona de silêncio e o pé — comparar caixas
+        # envolventes daria falso positivo com marcadores nos cantos da área.
+        qx_lo, qy_lo = mx - quiet_mm, my - quiet_mm
+        qx_hi, qy_hi = mx + size_mm + quiet_mm, my + size_mm + quiet_mm
+        for poly_mm in contours_mm:
+            inside_quiet = np.any(
+                (poly_mm[:, 0] >= qx_lo) & (poly_mm[:, 0] <= qx_hi)
+                & (poly_mm[:, 1] >= qy_lo) & (poly_mm[:, 1] <= qy_hi))
+            corners_in_foot = any(
+                cv2.pointPolygonTest(poly_mm.astype(np.float32), (float(cx), float(cy)),
+                                     False) >= 0
+                for cx, cy in ((qx_lo, qy_lo), (qx_hi, qy_lo),
+                               (qx_hi, qy_hi), (qx_lo, qy_hi)))
+            if inside_quiet or corners_in_foot:
+                raise ValueError(
+                    f"zona de silêncio do marcador {mid} sobrepõe um pé na cena"
+                )
+        canvas[qy0:qy1, qx0:qx1] = 250.0
+        canvas[py0:py0 + side_px, px0:px0 + side_px] = \
+            marker[:, :, None].astype(np.float32)
+        corners = np.array([
+            [mx, my], [mx + size_mm, my],
+            [mx + size_mm, my + size_mm], [mx, my + size_mm],
+        ], dtype=np.float64)
+        all_marker_corners.append(corners)
+        if first_corners is None:
+            first_corners = corners
+
+    marker_corners_plane = first_corners
 
     plane_img = np.clip(canvas, 0, 255).astype(np.uint8)
-    return plane_img, marker_corners_plane, contours_mm
+    return (plane_img, marker_corners_plane, contours_mm,
+            np.vstack(all_marker_corners))
+
+
+def _reference_corners_mm(ref, item) -> np.ndarray:
+    """Cantos físicos TL, TR, BR, BL do objeto, já posicionado e girado."""
+    a = math.radians(item.rotation_deg)
+    R = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+    return ref.model_mm @ R.T + np.array(item.origin_mm, dtype=np.float64)
+
+
+def _rounded_rect_mm(corners_mm: np.ndarray, radius_mm: float,
+                     arc_steps: int = 10) -> np.ndarray:
+    """Polígono denso com os cantos arredondados no raio da norma (ID-1: 3,18 mm).
+
+    O cartão físico não tem vértice: quem quiser o canto ideal precisa ajustar as
+    retas das arestas e intersectá-las. Renderizar o arredondamento de verdade é o
+    que torna esse requisito visível no teste."""
+    if radius_mm <= 0.0:
+        return corners_mm
+    out: list[np.ndarray] = []
+    for i in range(4):
+        here = corners_mm[i]
+        prev_c = corners_mm[(i - 1) % 4]
+        next_c = corners_mm[(i + 1) % 4]
+        u = (next_c - here) / max(np.linalg.norm(next_c - here), 1e-9)
+        v = (prev_c - here) / max(np.linalg.norm(prev_c - here), 1e-9)
+        centre = here + radius_mm * (u + v)
+        start, end = here + radius_mm * v, here + radius_mm * u
+        a0 = math.atan2(*(start - centre)[::-1])
+        a1 = math.atan2(*(end - centre)[::-1])
+        # Percorre o arco no sentido curto, o que mantém o polígono simples.
+        while a1 - a0 > math.pi:
+            a1 -= 2 * math.pi
+        while a0 - a1 > math.pi:
+            a1 += 2 * math.pi
+        for t in np.linspace(a0, a1, arc_steps):
+            out.append(centre + radius_mm * np.array([math.cos(t), math.sin(t)]))
+    return np.array(out, dtype=np.float64)
+
+
+def _polygons_intersect(a: np.ndarray, b: np.ndarray) -> bool:
+    poly_b = b.astype(np.float32)
+    if any(cv2.pointPolygonTest(poly_b, (float(x), float(y)), False) >= 0
+           for x, y in a):
+        return True
+    poly_a = a.astype(np.float32)
+    return any(cv2.pointPolygonTest(poly_a, (float(x), float(y)), False) >= 0
+               for x, y in b)
 
 
 def render_scene(spec: SceneSpec) -> SceneResult:
     rng = np.random.default_rng(spec.seed)
-    plane_img, marker_corners_plane, contours_mm = _render_plane(spec, rng)
+    plane_img, marker_corners_plane, contours_mm, all_corners = _render_plane(spec, rng)
 
     x0, y0, x1, y1 = spec.plane_extent_mm
     ppm = spec.plane_px_per_mm
     # mm → raster do plano
     A = np.array([[ppm, 0, -x0 * ppm], [0, ppm, -y0 * ppm], [0, 0, 1]], dtype=np.float64)
 
+    # O enquadramento precisa conter TODOS os marcadores do alvo — senão parte deles
+    # sai da foto e a calibração volta a depender de um só.
     quiet = 12.0
     content = np.vstack(
         ([np.vstack(contours_mm)] if contours_mm else [])
-        + [marker_corners_plane + np.array([[-quiet, -quiet], [quiet, -quiet],
-                                            [quiet, quiet], [-quiet, quiet]])]
+        + [all_corners + np.array([[-quiet, -quiet]]),
+           all_corners + np.array([[quiet, quiet]])]
     )
     lo, hi = content.min(axis=0), content.max(axis=0)
     scene_center = (lo + hi) / 2.0
@@ -242,16 +355,28 @@ def render_scene(spec: SceneSpec) -> SceneResult:
         if ok:
             img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
 
-    # Verdade no frame do MARCADOR (origem = canto superior esquerdo do marcador).
+    # Verdade no frame da REFERÊNCIA: origem no seu canto TL, eixo x ao longo da
+    # aresta TL→TR. Para um marcador ArUco alinhado isso é a identidade; para um
+    # cartão largado torto é a mesma convenção que `fit_free_rectangles` adota, e
+    # sem ela a verdade e a medida ficariam em frames diferentes.
     origin = marker_corners_plane[0]
-    truth = [c - origin for c in contours_mm]
+    ex = marker_corners_plane[1] - origin
+    ey = marker_corners_plane[3] - origin
+    ex = ex / max(float(np.linalg.norm(ex)), 1e-12)
+    ey = ey / max(float(np.linalg.norm(ey)), 1e-12)
+    basis = np.stack([ex, ey], axis=1)          # colunas: eixos do frame
+
+    def to_reference_frame(pts: np.ndarray) -> np.ndarray:
+        return (np.asarray(pts, dtype=np.float64).reshape(-1, 2) - origin) @ basis
+
+    truth = [to_reference_frame(c) for c in contours_mm]
     landmarks = []
     for foot in spec.feet:
         lm = foot_shape.expected_landmarks_mm(
             foot.length_mm, foot.laterality, spec.view,
             center_mm=foot.center_mm, rotation_deg=foot.rotation_deg,
         )
-        landmarks.append({k: v - origin for k, v in lm.items()})
+        landmarks.append({k: to_reference_frame(v)[0] for k, v in lm.items()})
 
     return SceneResult(
         image_bgr=img,
@@ -268,6 +393,32 @@ def render_scene(spec: SceneSpec) -> SceneResult:
 # ------------------------------------------------------------------ cenas prontas
 
 
+def board_scene(length_left_mm: float = 258.0, length_right_mm: float = 261.0,
+                area_mm: tuple[float, float] = (320.0, 480.0),
+                **overrides) -> SceneSpec:
+    """Cena com o alvo de QUATRO marcadores ao redor da área de apoio.
+
+    Layout recomendado: os pés ficam dentro do quadrilátero dos marcadores, de modo
+    que a homografia interpole em vez de extrapolar.
+    """
+    from ..calibration.target import board4_target
+
+    target = board4_target(area_mm=area_mm)
+    w, h = area_mm
+    cx, cy = w / 2.0, h / 2.0
+    spec = SceneSpec(
+        feet=[
+            FootSpec(length_right_mm, "right", center_mm=(cx - 62.0, cy)),
+            FootSpec(length_left_mm, "left", center_mm=(cx + 62.0, cy)),
+        ],
+        target=target,
+        plane_extent_mm=(-70.0, -70.0, w + 70.0, h + 70.0),
+    )
+    for k, v in overrides.items():
+        setattr(spec, k, v)
+    return spec
+
+
 def bilateral_scene(length_left_mm: float = 258.0, length_right_mm: float = 261.0,
                     **overrides) -> SceneSpec:
     """Duas plantas lado a lado, marcador acima e entre elas (layout de podoscópio)."""
@@ -277,6 +428,62 @@ def bilateral_scene(length_left_mm: float = 258.0, length_right_mm: float = 261.
             FootSpec(length_right_mm, "right", center_mm=(-72.0, -35.0)),
             FootSpec(length_left_mm, "left", center_mm=(72.0, -35.0)),
         ],
+    )
+    for k, v in overrides.items():
+        setattr(spec, k, v)
+    return spec
+
+
+def reference_scene(length_left_mm: float = 258.0, length_right_mm: float = 261.0,
+                    key: str = "card", count: int = 1,
+                    rotation_deg: float = 11.0, **overrides) -> SceneSpec:
+    """Cena calibrada por objeto de dimensão normalizada, sem nenhum ArUco.
+
+    ``count=1`` põe o objeto de um lado só (extrapolação, o caso realista de quem
+    não quer imprimir nada); ``count=2`` põe um de cada lado dos pés, que é a
+    configuração que devolve a interpolação e a exatidão do tabuleiro.
+    """
+    from ..calibration.reference import resolve_reference
+
+    ref = resolve_reference(key)
+
+    def place(centre_mm, deg):
+        """`origin_mm` é o canto TL; posicionar pelo centro é o que a pessoa faz."""
+        a = math.radians(deg)
+        R = np.array([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+        half = R @ np.array([ref.width_mm / 2.0, ref.height_mm / 2.0])
+        return (float(centre_mm[0] - half[0]), float(centre_mm[1] - half[1]))
+
+    # Objeto com o lado maior quase vertical, encostado ao lado dos pés — que é
+    # como um profissional apoiaria um cartão na plataforma.
+    upright = 90.0 - rotation_deg
+    a = math.radians(upright)
+    bbox_half_x = (abs(ref.width_mm / 2.0 * math.cos(a))
+                   + abs(ref.height_mm / 2.0 * math.sin(a)))
+    reach = 128.0 + bbox_half_x          # 128 mm livres a partir do eixo dos pés
+    # Dois objetos vão em diagonal — um na altura dos pododáctilos, outro na do
+    # calcâneo. Quatro fecham os cantos, e aí o casco dos pontos de controle envolve
+    # os pés: é a mesma condição de interpolação do alvo impresso.
+    spots = [(-reach, -118.0), (reach, 52.0), (reach, -118.0), (-reach, 52.0)]
+    tints = [(176, 128, 62), (96, 104, 168), (104, 148, 96), (150, 110, 150)]
+    items = []
+    for i in range(max(1, min(count, 4))):
+        cx, cy = spots[i]
+        deg = upright if cx < 0 else -upright
+        items.append(ReferenceSpec(key=key, origin_mm=place((cx, cy), deg),
+                                   rotation_deg=deg, bgr=tints[i]))
+
+    # A plataforma tem de cobrir todo o enquadramento automático da câmera: se
+    # sobrar piso escuro demais na foto, o teste passa a medir o gerador em vez do
+    # sistema.
+    half_x = reach + bbox_half_x + 60.0
+    spec = SceneSpec(
+        feet=[
+            FootSpec(length_right_mm, "right", center_mm=(-62.0, -35.0)),
+            FootSpec(length_left_mm, "left", center_mm=(62.0, -35.0)),
+        ],
+        references=items,
+        plane_extent_mm=(-half_x, -1.35 * half_x, half_x, 1.35 * half_x),
     )
     for k, v in overrides.items():
         setattr(spec, k, v)
